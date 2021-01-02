@@ -1,0 +1,11 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Cacophonia
+Bundle-SymbolicName: cacophonia;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Vendor: ChrisLaffra
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.ui
+Bundle-RequiredExecutionEnvironment: JavaSE-15
+Import-Package: javax.inject
+Automatic-Module-Name: cacophonia
