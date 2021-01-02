@@ -1,5 +1,7 @@
-# cacophonia
-Run Eclipse with bytecode instrumentation to learn about its execution
+# Project Cacophonia
+Run Eclipse with bytecode instrumentation to better understand its execution.
+
+![Cacophonia UI](/images/project-clean.png)
 
 ## Setup
 
@@ -12,7 +14,7 @@ Run Eclipse with bytecode instrumentation to learn about its execution
  
 By now, you should see something looking like this:
 
- ![Cacophonia UI](/images/project-clean.png)
+![Cacophonia UI](/images/project-clean.png)
 
 ## Launch
 
