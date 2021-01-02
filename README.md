@@ -17,9 +17,9 @@ By now, you should see something looking like this:
 ## Launch
 
  - Select "Cacophonia.launch" and run it as Eclipse launch named "Cacophonia"
- - This will launch the Cacophonia UI
+ - This will launch the Cacophonia UI:
  
- ![Cacophonia UI](/images/ui-launch.png)
+   ![Cacophonia UI](/images/ui-launch.png)
  
  ## Enabling Sound
  
@@ -27,7 +27,17 @@ By now, you should see something looking like this:
  - Switch sound themes by choosing a different theme in the dropdown showing "Suspense"
  - Choose your own instruments by checking "manual"
    - All instruments will be muted
-   - Select a given instrument and then choose an instrument from the dropdown.
-   
+   - Select a given plugin (e.g., "swt") and then choose an instrument (e.g., "xylophone") from the dropdown:
 
- ![Cacophonia UI](/images/ui-swt-xylophone.png)
+     ![Cacophonia UI](/images/ui-swt-xylophone.png)
+ 
+   - If you hear nothing, toggle the mute button.
+   
+ ## Investigating Plugins
+ 
+ After running Eclipse for a while, you will notice a job running every 5 seconds. You can more easily discover
+ this by selecting the "core jobs" plugin in the Cacophonia UI and assign an instrument to it, for instance "Marimba", 
+ as is done below:
+
+     ![Cacophonia UI](/images/ui-swt-xylophone.png)
+
