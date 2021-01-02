@@ -5,12 +5,11 @@ Run Eclipse with bytecode instrumentation to better understand its execution.
 
 ## Setup
 
- - Launch Eclipse for Committers.
- - From the Project Explore, Import a project from git.
+ - Install and Launch Eclipse for Committers.
+ - From the `Project Explorer`, Import a project from git.
  - Chose the URL "https://github.com/laffra/cacophonia.git"
- - Import all Eclipse projects
- - Switch to the project and open properties for the file "build_agent.sh". Make it executable.
- - Run Project > Clean
+ - Switch back to the `Project Explorer` and open properties for the file `build_agent.sh`. Make it executable.
+ - Run `Project > Clean...`
  
 By now, you should see something looking like this:
 
@@ -18,18 +17,20 @@ By now, you should see something looking like this:
 
 ## Launch
 
- - Select "Cacophonia.launch" and run it as Eclipse launch named "Cacophonia"
+ - Select the file `Cacophonia.launch` and run it as Eclipse launch named `Cacophonia`
  - This will launch the Cacophonia UI:
  
    ![Cacophonia UI](/images/ui-launch.png)
  
 ## Enabling Sound
- 
- - Click the "mute" checkbox in the UI to toggle sound
- - Switch sound themes by choosing a different theme in the dropdown showing "Suspense"
- - Choose your own instruments by checking "manual"
+
+Inside the Cacophonia UI, you can enable sounds when certain plugins interact:
+
+ - Click the `mute` checkbox in the UI to toggle sound
+ - Switch sound themes by choosing a different theme in the dropdown showing `Suspense`
+ - Choose your own instruments by checking `manual`
    - All instruments will be muted
-   - Select a given plugin (e.g., "swt") and then choose an instrument (e.g., "xylophone") from the dropdown:
+   - Select a given plugin (e.g., `swt`) and then choose an instrument (e.g., `xylophone`) from the dropdown:
 
      ![Cacophonia UI](/images/ui-swt-xylophone.png)
  
@@ -174,10 +175,14 @@ provide Eclipse with a task-focused interface to reduce information overload and
 ## Conclusions
 
 In this project we show how easy it is to instrument Eclipse, visualize its execution, and quickly find out a lot
-of things about a system consisting out of hundreds of plugins and thousands of classes. The amount of information
-we glean by just watching and listening, is something that would have taken dozens or hundreds hours of setting 
-breakpoints and inserting print statements. 
+of things about a system consisting out of hundreds of plugins and thousands of classes. The total source size is
+around just 800 lines of Java.
+
+Visualization is an effective teaching tool. The amount of information we glean by just watching and listening, 
+is something that would have taken dozens or hundreds hours of setting breakpoints and inserting print statements
+in the Eclipse source code. And we would not know even where to start. 
 
 Visualization of complex systems increases understanding of how the system interacts and helps us discover 
 inefficiencies, anomolies, or problems more easily. 
 
+Clone the project and let me know what visualizations or sounds you came up with!
