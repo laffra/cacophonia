@@ -37,8 +37,8 @@ By now, you should see something looking like this:
 
 Cacophonia exists of three separate components:
 
-1. A Java agent, see [Agent.java](src/Agent.java)
-2. A runtime, see [Cacophonia.java](src/Cacophonia.java)
+1. A Java agent, see [Agent.java](https://github.com/laffra/cacophonia/blob/main/src/cacophonia/Agent.java)
+2. A runtime, see [Cacophonia.java](/src/cacophonia/Cacophonia.java)
 3. A UI, see [UI.java](src/UI.java)
 
 The agent is enabled in the launch configuration. The `agent_build.sh` build script creates the jar and copies it to
