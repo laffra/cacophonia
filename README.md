@@ -102,24 +102,24 @@ Let us investigate what the job is doing. For that, we will revisit the Cacophon
 In that file, locate the `Method.enter` method:
 
 ```java
-    public void enter() {
-        callCount++;
-		      if (Cacophonia.debug) System.out.println(String.format("> %d %s %s", callCount, plugin, name));
-		      if (!lastPlugin.equals(plugin)) {
-			         Stack<String> stack = pluginStack.get();
-			         stack.push(plugin);
-			         remoteUI.sendEvent(String.format("%s %s", lastPlugin, plugin));
-		      }
-		      lastPlugin = plugin;
-	   }
+public void enter() {
+    callCount++;
+    if (Cacophonia.debug) System.out.println(String.format("> %d %s %s", callCount, plugin, name));
+    if (!lastPlugin.equals(plugin)) {
+        Stack<String> stack = pluginStack.get();
+        stack.push(plugin);
+        remoteUI.sendEvent(String.format("%s %s", lastPlugin, plugin));
+    }
+    lastPlugin = plugin;
+}
 ```
 
 At the end of this method, add an extra print statement:
 
 ```java
-        if (plugin.startsWith("org.eclipse.core.jobs")) {
-			         System.out.println(String.format("# %d %s", callCount, name));
-		      }
+    if (plugin.startsWith("org.eclipse.core.jobs")) {
+        System.out.println(String.format("# %d %s", callCount, name));
+    }
 ```
 
 When you save the file, you should see the agent build script run and update the agent jar with the new runtime.
@@ -134,4 +134,48 @@ the plugin itself first. For that, we will import the plugin into our Eclipse wo
 
 ![Cacophonia UI](/images/import-plugin.png)
 
+As Eclipse jobs are essentially implemented as Java threads, we will search for anything implementing a Java
+thread. Such implementation will always override `void run()`, so we search for that.
+
+![Cacophonia UI](/images/import-plugin.png)
+
+The first in `Worker.java` looks very promising as it adds a jobs and runs it:
+
+```java
+    setName(getJobName());
+    result = currentJob.run(monitor);
+```
+
+We change this code into:
+
+```java
+    setName(getJobName());
+    System.out.println("Run job: " + currentJob.getClass().getName() + " '" + currentJob.getName() + "'");
+    result = currentJob.run(monitor);
+```
+
+Notice that we are actually changing Eclipse's implementation this time. The nice thing about Eclipse is that
+it is very easy to self-host Eclipse, i.e., develope Eclipse with Eclipse. That is what we do now.
+
+Save your changes and launch the Eclipse launch configuration again and you should see something like this happen:
+
+![Cacophonia UI](/images/trace-jobs-worker.png)
+
+Notice how all the print statements from our runtime changes still show up. Remove those and things get less noisy:
+
+![Cacophonia UI](/images/trace-jobs-worker-less-noise.png)
+
+As you can see, the jobs that run at 5 second intervals appear to belong to the `org.eclipse.mylyn` plugins. A quick
+Google search for Mylyn teaches us that it has been a part of Eclipse for a long time and its goal is to 
+provide Eclipse with a task-focused interface to reduce information overload and makes multitasking easy. 
+
+## Conclusions
+
+In this project we show how easy it is to instrument Eclipse, visualize its execution, and quickly find out a lot
+of things about a system consisting out of hundreds of plugins and thousands of classes. The amount of information
+we glean by just watching and listening, is something that would have taken dozens or hundreds hours of setting 
+breakpoints and inserting print statements. 
+
+Visualization of complex systems increases understanding of how the system interacts and helps us discover 
+inefficiencies, anomolies, or problems more easily. 
 
