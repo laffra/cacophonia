@@ -96,26 +96,32 @@ To paraphrase Richard Feynman, to most effectively use a tool, it is best to hav
 
 By observing the visualization, you may learn quite a few things about Eclipse. Examples:
 
- - The Eclipse splash screen could have a better scrollbar. It quickly jumps from 10% to 80% and hangs there. A lot of plugins are still being loaded while no progress is shown in the splash screen.
- - It takes 147 plugins to launch Eclipse. 
- - After Eclipse opens, more plugins get loaded to a total of 175 plugins. By then, we loaded more than 7,000 Eclipse classes (JRE classes are not counted)
- - Switching to another perspective (say from Default to Plugin-in Development) adds only a handful
- - With each "new" activity or task you will notice more plugins will need to be added. This shows the scalability of the Eclipse platform.
- - If you create a project and edit a Java file, you will notice Eclipse has a "heartbeat" to draw the insertion cursor. Play around. You will see that different input fields involve different plugins. 
- - Launch the Search dialog. Notice that Eclipse is polling more aggressively now. 
- - Notice how mylyn is involved in many things.
- - Notice "oomph" (if you used the eclipse installer) 
+ - The Eclipse splash screen could have a better progress bar. It does nothing for a while, then quickly jumps to 80%, and then just hangs there. A lot of plugins are still being loaded while no progress is shown in the splash screen. I care about this part quite a bit, as I used to spend a lot of time on the splash screen when I worked on Eclipse performance, a long time ago.
+ - It takes 147 plugins to launch Eclipse and see the IDE come alive. For reference, in 2004, it took 26 plugins. 
+ - It takes about 20s to launch with all the instrumentation happening, versus 10s normal launch time. So, startup is roughly 2X slower with Cacophonia. Interestingly enough, during normal usage of Eclipse, you cannot really tell the visualization is happening. Just when new features are loaded, you can tell a lot of extra work is being done. 
+ - After Eclipse opens, 28 more plugins get loaded to a total of 175 plugins. By then, we loaded more than 7,000 Eclipse classes (JRE classes are not counted)
+ - Switching to another perspective (say from Default to Plugin-in Development) adds only a handful of extra plugins.
+ - With each "new" activity or task you will notice more plugins will need to be added. This shows the well-designed internal architecture of the Eclipse platform. The IDE is really one big monolith, but feature are only loaded and activated when needed. Plugins are decoupled from each other using the OSGI bundle framework. In that sense, Eclipse really acts like a micro-services architecture.
+ - When you create a project and edit a Java file, you will notice Eclipse has a "heartbeat" to draw the insertion cursor. If you play around, you will see different heart beats. Different input fields involve different plugins and generate different patterns. 
+ - When you open the Search dialog, you will notice that Eclipse is polling more aggressively now. A similar thing happens during debug. If you bring up the Activity Monitor, you will notice that Eclipse is actually spinning the CPU at around 10% of a core. 
+ - Mylyn is involved in many things. It almost looks like a spying tool, but I am sure it is not.
+ - If you used the Eclipse Installer, like I did, you will notice a lot of "oomph" plugins. Not sure what they all do... 
  - Set a breakpoint in your Java code and step into the code. Notice the UI and see how Eclipse supports debugging.
+ - When you have a dialog open, such as the search dialog, click on the `?` icon and see what plugins are loaded. You will see Eclipse will run a webserver.
 
-## Investigating Plugins
+## Investigating Plugins In More Detail
  
-After running Eclipse for a while, you may notice an Eclipse job running every 5 seconds. You can more easily discover
-this by selecting the "core jobs" plugin in the Cacophonia UI and assign an instrument to it, for instance "Marimba", 
-as is done below:
+Aside from the explorations shown above, after running Eclipse for a while, you may notice a certain Eclipse job running every 5 seconds. 
+You can more easily notice the occurence of this event as follows:
+ - In the Cacophonia UI, click on `manual`.
+ - Select the "core jobs" plugin. It will turn bright red.
+ - Look in the top of the UI and assign an instrument to the plugin, for instance "Marimba".
+ 
+This will look like the following:
 
 ![Cacophonia UI](/images/core-jobs-marimba.png)
 
-The plugin we selected (core jobs) is shown bright red. All the plugins that were invoked during the job's execution are light red. The 
+The plugin we selected, `core jobs`, is shown bright red. All the plugins that were invoked during the job's execution are light red. The 
 lines between the plugins indicate Java calls made from one plugin to another. One of them that stands out quite a bit is 
 the "mylyn monitor ui" plugin.
 
@@ -135,7 +141,7 @@ public void enter() {
 }
 ```
 
-At the end of this method, add an extra print statement:
+At the end of this method, we add an extra print statement:
 
 ```java
     if (plugin.startsWith("org.eclipse.core.jobs")) {
@@ -150,17 +156,18 @@ Relaunch the Eclipse launch configuration now, and you should see something like
 
 This does show us all the methods invoked inside the `org.eclipse.core.jobs` plugin, but it does not tell us 
 much yet what jobs are actually being run. We can update our runtime to pass the object itself and then print
-out more details about the method being called. However, we don't know what to print yet. So, let's look at 
+out more details about the method being called. However, we don't know what to print yet. So, let us look at 
 the plugin itself first. For that, we will import the plugin into our Eclipse workspace.
 
 ![Cacophonia UI](/images/import-plugin.png)
 
-As Eclipse jobs are essentially implemented as Java threads, we will search for anything implementing a Java
+Eclipse jobs are essentially implemented as Java threads. This is explained in [this FAQ](https://wiki.eclipse.org/FAQ_Does_the_platform_have_support_for_concurrency%3F). 
+So, to find out interesting things about running jobs, we will search for anything implementing a Java
 thread. Such implementation will always override `void run()`, so we search for that.
 
 ![Cacophonia UI](/images/search.png)
 
-The first in `Worker.java` looks very promising as it adds a jobs and runs it:
+The occurrence in `Worker.java` looks very promising as it appears to activate a job and then run it:
 
 ```java
     setName(getJobName());
@@ -176,31 +183,33 @@ We change this code into:
 ```
 
 Notice that we are actually changing Eclipse's implementation this time. The nice thing about Eclipse is that
-it is very easy to self-host Eclipse, i.e., develope Eclipse with Eclipse. That is what we do now.
+it is very easy to self-host, i.e., develop Eclipse using Eclipse. That is what we do now.
 
 Save your changes and launch the Eclipse launch configuration again and you should see something like this happen:
 
 ![Cacophonia UI](/images/trace-jobs-worker.png)
 
-Notice how all the print statements from our runtime changes still show up. Remove those and things get less noisy:
+Notice how all the print statements from our runtime changes still show up. If we remove those, things get less noisy:
 
 ![Cacophonia UI](/images/trace-jobs-worker-less-noise.png)
 
 As you can see, the jobs that run at 5 second intervals appear to belong to the `org.eclipse.mylyn` plugins. A quick
 Google search for Mylyn teaches us that it has been a part of Eclipse for a long time and its goal is to 
-provide Eclipse with a task-focused interface to reduce information overload and makes multitasking easy. 
+provide Eclipse with a task-focused interface to reduce information overload and makes multitasking easy. For that it
+needs to keep track on how you use the Eclipse UI and what kind of task or activity is currently active. 
 
 ## Conclusions
 
 In this project we show how easy it is to instrument Eclipse, visualize its execution, and quickly find out a lot
-of things about a system consisting out of hundreds of plugins and thousands of classes. The total source size is
-around just 800 lines of Java.
+of things about a system consisting out of hundreds of plugins and thousands of classes. The total source size of
+the Cacophonia project is around just 800 lines of Java. So, this is a tiny amount to get so much value.
 
 Visualization is an effective teaching tool. The amount of information we glean by just watching and listening, 
-is something that would have taken dozens or hundreds hours of setting breakpoints and inserting print statements
-in the Eclipse source code. And we would not know even where to start. 
+is something that would have taken dozens or hundreds of hours of us setting breakpoints, reading source code, and
+inserting print statements in the Eclipse source code. The biggest problem is that we would not know even where to
+start our investigations. 
 
-Visualization of complex systems increases understanding of how the system interacts and helps us discover 
-inefficiencies, anomolies, or problems more easily. 
+Visualization of complex systems increases our understanding of how the system works and helps us discover 
+inefficiencies, anomolies, and problems more easily. 
 
-Clone the project and let me know what visualizations or sounds you came up with!
+Please clone the project, try it out, and let me know what you learned and what visualizations or fun sounds you came up with!
