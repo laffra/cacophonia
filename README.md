@@ -21,7 +21,7 @@ By now, you should see something looking like this:
  - Select the file `Cacophonia.launch` and run it as Eclipse launch named `Cacophonia`
  - This will launch the Cacophonia UI:
  
-   ![Cacophonia UI](/images/ui-launch.png)
+   ![Cacophonia UI](/images/cacophonia-launch.png)
  
 ## Enabling Sound
 
