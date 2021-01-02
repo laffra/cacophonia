@@ -37,9 +37,9 @@ By now, you should see something looking like this:
 
 Cacophonia exists of three separate components:
 
-1. A Java agent, see [Agent.java](https://github.com/laffra/cacophonia/blob/main/src/cacophonia/Agent.java)
+1. A Java agent, see [Agent.java](/src/cacophonia/Agent.java)
 2. A runtime, see [Cacophonia.java](/src/cacophonia/Cacophonia.java)
-3. A UI, see [UI.java](src/UI.java)
+3. A UI, see [UI.java](/src/cacophonia/UI.java)
 
 The agent is enabled in the launch configuration. The `agent_build.sh` build script creates the jar and copies it to
 your home directory. That jar is then passed to the JVM. See the launch configuration:
@@ -52,7 +52,7 @@ method is entered and left. You can see what the agent is processing by watching
 
 ![Cacophonia UI](/images/eclipse-console.png)
 
-Look for the `System.out.println` calls in [Agent.java](src/Agent.java) to see what the agent does.
+Look for the `System.out.println` calls in [Agent.java](/src/cacophonia/Agent.java) to see what the agent does.
 
 After the code is loaded by the agent, the Cacophonia runtime will handle method enter and leave events to 
 find out which plugin is calling which other plugin. This is done by using the classLoader for each object.
@@ -98,7 +98,7 @@ The plugin we selected (core jobs) is shown bright red. All the plugins that wer
 lines between the plugins indicate Java calls made from one plugin to another. One of them that stands out quite a bit is 
 the "mylyn monitor ui" plugin.
 
-Let us investigate what the job is doing. For that, we will revisit the Cacophonia runtime in [Cacophonia.java](src/Cacophonia.java).
+Let us investigate what the job is doing. For that, we will revisit the Cacophonia runtime in [Cacophonia.java](/src/cacophonia/Cacophonia.java).
 In that file, locate the `Method.enter` method:
 
 ```java
@@ -132,6 +132,6 @@ much yet what jobs are actually being run. We can update our runtime to pass the
 out more details about the method being called. However, we don't know what to print yet. So, let's look at 
 the plugin itself first. For that, we will import the plugin into our Eclipse workspace.
 
-
+![Cacophonia UI](/images/import-plugin.png)
 
 
