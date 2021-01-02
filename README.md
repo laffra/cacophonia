@@ -26,10 +26,10 @@ By now, you should see something looking like this:
 
 Inside the Cacophonia UI, you can enable sounds when certain plugins interact:
 
- - Click the `mute` checkbox in the UI to toggle sound
- - Switch sound themes by choosing a different theme in the dropdown showing `Suspense`
- - Choose your own instruments by checking `manual`
-   - All instruments will be muted
+ - Click the `mute` checkbox in the UI to toggle sound.
+ - Switch sound themes by choosing a different theme in the dropdown showing `Suspense`.
+ - Choose your own instruments by checking `manual`:
+   - All instruments will be muted.
    - Select a given plugin (e.g., `swt`) and then choose an instrument (e.g., `xylophone`) from the dropdown:
 
      ![Cacophonia UI](/images/ui-swt-xylophone.png)
@@ -40,22 +40,28 @@ Inside the Cacophonia UI, you can enable sounds when certain plugins interact:
 
 Cacophonia exists of three separate components:
 
-1. A Java agent, see [Agent.java](/src/cacophonia/Agent.java)
-2. A runtime, see [Cacophonia.java](/src/cacophonia/Cacophonia.java)
-3. A UI, see [UI.java](/src/cacophonia/UI.java)
+![Cacophonia UI](/images/architecture.png)
 
+### The Agent
+
+This is a Java agent, see [Agent.java](/src/cacophonia/Agent.java), which is passed to the JVM at startup.
 The agent is enabled in the launch configuration. The `agent_build.sh` build script creates the jar and copies it to
 your home directory. That jar is then passed to the JVM. See the launch configuration:
 
 ![Cacophonia UI](/images/eclipse-launch-configuration.png)
 
-The agent is passed a byte array for each class loaded during Eclipse's execution. That byte array is given to 
-Javassist and each method found in every class is then instrumented to call the Cacophonia runtime everytime a 
-method is entered and left. You can see what the agent is processing by watching the Eclipse console:
+A byte array is passed to the Agent for each class being loaded during Eclipse's execution. That byte array is given to 
+Javassist and each method found in every class is then instrumented to call the Cacophonia runtime. The result is that
+when Eclipse launches, every time a method is entered and left, Cacophonia's runtime is notified. 
+In the Eclipse console you can see what plugins and classes the agent sees coming by:
 
 ![Cacophonia UI](/images/eclipse-console.png)
 
-Look for the `System.out.println` calls in [Agent.java](/src/cacophonia/Agent.java) to see what the agent does.
+Look for the `System.out.println` calls in [Agent.java](/src/cacophonia/Agent.java).
+
+### The Runtime
+
+The runtime, see [Cacophonia.java](/src/cacophonia/Cacophonia.java), is invoked by Eclipse at runtime.
 
 After the code is loaded by the agent, the Cacophonia runtime will handle method enter and leave events to 
 find out which plugin is calling which other plugin. This is done by using the classLoader for each object.
@@ -66,6 +72,10 @@ callstack per thread and handle concurrent access.
 Once we determined a call is being made from one plugin to another, we send an event to the remote UI, which
 runs in another process. The UI is actually launched by the agent.
 
+### The UI
+
+Finally, the UI, see [UI.java](/src/cacophonia/UI.java), is running in a separate process.
+
 The UI receives the event and draws a line between the two plugins in its UI. Timer threads are used to detect 
 if a call took place between two plugins and to decay the line over time. The UI itself is a simple Java AWT
 implementation using double-buffered drawing into a canvas.
@@ -73,10 +83,14 @@ implementation using double-buffered drawing into a canvas.
 The UI also has support for generating sounds for each plugin using Java's midi API.
 
 
-## Looking Under The Hood
+## Why Do We Care?
 
-The whole goal of Cacophonia and its UI is to show you what is happening inside Eclipse "under the hood". By observing the visualization,
-you may learn quite a few things about Eclipse. Examples:
+The whole goal of Cacophonia and its UI is to show you what is happening inside Eclipse "under the hood". 
+To paraphrase Richard Feynman, to most effectively use a tool, it is best to have a good understanding of how it works.
+
+![Cacophonia UI](/images/feynman.png)
+
+By observing the visualization, you may learn quite a few things about Eclipse. Examples:
 
  - The Eclipse splash screen could have a better scrollbar. It quickly jumps from 10% to 80% and hangs there. A lot of plugins are still being loaded while no progress is shown in the splash screen.
  - It takes 147 plugins to launch Eclipse. 
