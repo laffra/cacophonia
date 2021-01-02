@@ -21,7 +21,7 @@ By now, you should see something looking like this:
  
    ![Cacophonia UI](/images/ui-launch.png)
  
- ## Enabling Sound
+## Enabling Sound
  
  - Click the "mute" checkbox in the UI to toggle sound
  - Switch sound themes by choosing a different theme in the dropdown showing "Suspense"
@@ -33,11 +33,12 @@ By now, you should see something looking like this:
  
    - If you hear nothing, toggle the mute button.
    
- ## Investigating Plugins
+## Investigating Plugins
  
- After running Eclipse for a while, you will notice a job running every 5 seconds. You can more easily discover
- this by selecting the "core jobs" plugin in the Cacophonia UI and assign an instrument to it, for instance "Marimba", 
- as is done below:
+After running Eclipse for a while, you may notice an Eclipse job running every 5 seconds. You can more easily discover
+this by selecting the "core jobs" plugin in the Cacophonia UI and assign an instrument to it, for instance "Marimba", 
+as is done below:
 
-     ![Cacophonia UI](/images/ui-swt-xylophone.png)
+![Cacophonia UI](/images/core-jobs-marimba.png)
 
+Let us investigate what this job is doing. 
