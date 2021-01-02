@@ -140,7 +140,7 @@ the plugin itself first. For that, we will import the plugin into our Eclipse wo
 As Eclipse jobs are essentially implemented as Java threads, we will search for anything implementing a Java
 thread. Such implementation will always override `void run()`, so we search for that.
 
-![Cacophonia UI](/images/import-plugin.png)
+![Cacophonia UI](/images/search.png)
 
 The first in `Worker.java` looks very promising as it adds a jobs and runs it:
 
