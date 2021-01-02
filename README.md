@@ -20,3 +20,14 @@ By now, you should see something looking like this:
  - This will launch the Cacophonia UI
  
  ![Cacophonia UI](/images/ui-launch.png)
+ 
+ ## Enabling Sound
+ 
+ - Click the "mute" checkbox in the UI to toggle sound
+ - Switch sound themes by choosing a different theme in the dropdown showing "Suspense"
+ - Choose your own instruments by checking "manual"
+   - All instruments will be muted
+   - Select a given instrument and then choose an instrument from the dropdown.
+   
+
+ ![Cacophonia UI](/images/ui-swt-xylophone.png)
