@@ -1,5 +1,6 @@
 # Project Cacophonia
-Run Eclipse with bytecode instrumentation to better understand its execution.
+
+This project visualizes Eclipse to better understand how it works internally.
 
 ![Cacophonia UI](/images/overview.png)
 
