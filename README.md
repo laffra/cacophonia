@@ -8,7 +8,7 @@ This project visualizes Eclipse to better understand how it works internally.
 
  - Install and Launch Eclipse for Committers.
  - From the `Project Explorer`, Import a project from git.
- - Chose the URL "https://github.com/laffra/cacophonia.git"
+ - Chose the URL  https://github.com/laffra/cacophonia.git
  - Switch back to the `Project Explorer` and open properties for the file `build_agent.sh`. Make it executable.
  - Run `Project > Clean...`
  
