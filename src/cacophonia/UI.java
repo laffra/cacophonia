@@ -251,8 +251,7 @@ public class UI {
 		header.add(previous);
 		header.add(instrumentSelector);
 		header.add(next);
-
-        container.add(header, BorderLayout.NORTH);
+		container.add(header, BorderLayout.NORTH);
 		
 		canvas = new CacophoniaCanvas();
 		container.add(canvas, BorderLayout.CENTER);
