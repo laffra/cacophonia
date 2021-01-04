@@ -3,6 +3,7 @@
 This project visualizes Eclipse to better understand how it works internally.
 
 ![Cacophonia UI](/images/animation.gif)
+
 See a recording with sound [here](https://vimeo.com/496876600/3f60a88207).
 
 ## Setup
