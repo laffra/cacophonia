@@ -2,7 +2,7 @@
 
 This project visualizes Eclipse to better understand how it works internally.
 
-![Cacophonia UI](/images/overview.png)
+![Cacophonia UI](/images/animation.gif)
 
 ## Setup
 
