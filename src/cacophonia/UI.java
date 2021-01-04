@@ -226,7 +226,32 @@ public class UI {
 				}
 			}
 		});
+		Button previous = new Button("<");
+		previous.setPreferredSize(new Dimension(25, 20));
+		previous.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if (Plugin.selectedPlugin != null) {
+					Plugin plugin = Plugin.selectedPlugin;
+					plugin.instrument = Math.max(plugin.instrument - 1, -1);
+					instrumentSelector.setSelectedIndex(plugin.instrument + 1);
+				}
+			}
+		});
+		Button next = new Button(">");
+		next.setPreferredSize(new Dimension(25, 20));
+		next.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if (Plugin.selectedPlugin != null) {
+					Plugin plugin = Plugin.selectedPlugin;
+					plugin.instrument = Math.max(plugin.instrument + 1, -1);
+					instrumentSelector.setSelectedIndex(plugin.instrument + 1);
+				}
+			}
+		});
+		header.add(previous);
 		header.add(instrumentSelector);
+		header.add(next);
+
         container.add(header, BorderLayout.NORTH);
 		
 		canvas = new CacophoniaCanvas();

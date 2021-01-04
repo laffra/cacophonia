@@ -1,5 +1,6 @@
 set -e
 
+pwd
 OUTPUT_JARNAME=cacophonia.1.0.0.jar
 JAVASSIST_JARNAME=../javassist.3.27.0.jar
 
