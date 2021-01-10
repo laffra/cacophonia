@@ -19,12 +19,15 @@ import java.awt.Label;
 import java.awt.MenuItem;
 import java.awt.MouseInfo;
 import java.awt.PopupMenu;
+import java.awt.TextField;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.TextEvent;
+import java.awt.event.TextListener;
 import java.awt.image.BufferedImage;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -77,6 +80,8 @@ public class UI {
 	protected static int instrumentStartNumber;
 	static JComboBox<Object> instrumentSelector;
 	static DataOutputStream eventStream;
+	static String pluginFilter = "";
+
 
 	public static void main(String args[]) {
 		setupListener();
@@ -187,8 +192,8 @@ public class UI {
 	private static void createUI() {
 		JFrame frame = new JFrame("Eclipse Cacophonia");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		Container container = frame.getContentPane();
-		container.setLayout(new BorderLayout());
+		Container mainContainer = frame.getContentPane();
+		mainContainer.setLayout(new BorderLayout());
 		
 		Container header = new Container();
 		header.setPreferredSize(new Dimension(800, 40));
@@ -217,15 +222,6 @@ public class UI {
 			}
 		});
 		header.add(themeChooser);
-		header.add(new Label("|"));
-		Button clear = new Button("clear");
-		clear.addActionListener(new ActionListener() {			
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				Plugin.clear();
-			}
-		});
-		header.add(clear);
 		header.add(new Label("|"));
 		Checkbox manual = new Checkbox("manual", false);
 		manual.addMouseListener(new MouseAdapter() {
@@ -273,13 +269,38 @@ public class UI {
 				}
 			}
 		});
-		header.add(previous);
-		header.add(instrumentSelector);
-		header.add(next);
-		container.add(header, BorderLayout.NORTH);
+		Container instrumentContainer = new Container();
+		instrumentContainer.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
+		instrumentContainer.add(previous);
+		instrumentContainer.add(instrumentSelector);
+		instrumentContainer.add(next);
+		header.add(instrumentContainer);
+		mainContainer.add(header, BorderLayout.NORTH);
+
+		header.add(new Label("|"));
+		Button clear = new Button("clear");
+		clear.addActionListener(new ActionListener() {			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				Plugin.clear();
+			}
+		});
+		header.add(clear);
+		Container filterContainer = new Container();
+		filterContainer.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
+		filterContainer.add(new Label("filter:"));
+		TextField filter = new TextField(16);
+		filter.addTextListener(new TextListener() {	
+			@Override
+			public void textValueChanged(TextEvent e) {
+				UI.pluginFilter = filter.getText();
+			}
+		});
+		filterContainer.add(filter);
+		header.add(filterContainer);
 		
 		canvas = new CacophoniaCanvas();
-		container.add(canvas, BorderLayout.CENTER);
+		mainContainer.add(canvas, BorderLayout.CENTER);
 		
 		frame.setLocation(2300, 5);
 		frame.setSize(WIDTH, HEIGHT);
@@ -381,6 +402,8 @@ class Plugin {
 	
 	static void drawAll(Graphics2D g) {
 		for (Plugin plugin : plugins.values()) {
+			if (UI.pluginFilter != "" && plugin.name.indexOf(UI.pluginFilter) == -1)
+				continue;
 			plugin.draw(g);
 		}
 	}
