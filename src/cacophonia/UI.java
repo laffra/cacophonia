@@ -15,6 +15,10 @@ import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.Label;
+import java.awt.MenuItem;
+import java.awt.MouseInfo;
+import java.awt.PopupMenu;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
@@ -23,7 +27,9 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.EOFException;
+import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -50,9 +56,6 @@ import javax.swing.JFrame;
  * <li> A line is drawn between the two plugins in a contrasting color. The line slowly fades out.
  * <li> A sound is played to indicate which plugins are involved. Each plugin uses a different instrument and tone.
  * </ul>
- * 
- * @author Chris Laffra
- *
  */
 public class UI {
 	static CacophoniaCanvas canvas;
@@ -73,6 +76,7 @@ public class UI {
 	static HashMap<String, Integer> scores = new HashMap<>();
 	protected static int instrumentStartNumber;
 	static JComboBox<Object> instrumentSelector;
+	static DataOutputStream eventStream;
 
 	public static void main(String args[]) {
 		setupListener();
@@ -107,6 +111,7 @@ public class UI {
 					ServerSocket serverSocket = new ServerSocket(6666);  
 					Socket socket = serverSocket.accept();   
 					DataInputStream dis=new DataInputStream(socket.getInputStream());  
+					eventStream = new DataOutputStream(socket.getOutputStream());
 					while (true) {
 						try {
 							String pluginToPlugin = (String)dis.readUTF();
@@ -127,6 +132,15 @@ public class UI {
 				}  
 			}
 		}).start();
+	}
+
+	static void sendEvent(int command, String details) {
+		try {
+			eventStream.writeInt(command);
+			eventStream.writeUTF(details);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	protected static void updateScores() {
@@ -177,8 +191,9 @@ public class UI {
 		container.setLayout(new BorderLayout());
 		
 		Container header = new Container();
-		header.setLayout(new FlowLayout());
-		header.setPreferredSize(new Dimension(WIDTH, 30));
+		header.setPreferredSize(new Dimension(800, 40));
+		header.setLayout(new FlowLayout(FlowLayout.CENTER, 15, 5));
+		header.setPreferredSize(new Dimension(WIDTH,40));
 		Checkbox checkbox = new Checkbox("mute", true);
 		checkbox.addMouseListener(new MouseAdapter() {
 			@Override
@@ -202,12 +217,22 @@ public class UI {
 			}
 		});
 		header.add(themeChooser);
+		header.add(new Label("|"));
+		Button clear = new Button("clear");
+		clear.addActionListener(new ActionListener() {			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				Plugin.clear();
+			}
+		});
+		header.add(clear);
+		header.add(new Label("|"));
 		Checkbox manual = new Checkbox("manual", false);
 		manual.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
 				UI.manual = !manual.getState();
-				Plugin.clear();
+				Plugin.clearInstruments();
 			}
 		});
 		header.add(manual);
@@ -256,7 +281,6 @@ public class UI {
 		canvas = new CacophoniaCanvas();
 		container.add(canvas, BorderLayout.CENTER);
 		
-		frame.pack();
 		frame.setLocation(2300, 5);
 		frame.setSize(WIDTH, HEIGHT);
 		frame.setVisible(true);
@@ -296,9 +320,6 @@ class SoundTheme {
 /**
  * Represents a plugin. Its name will be abbreviated. Each plugin has its own location in the canvas it is drawn on.
  * Each plugin has a unique instrument and tone used to generate sound.
- * 
- * @author Chris Laffra
- *
  */
 class Plugin {
 	static HashMap<String,Plugin>plugins = new HashMap<>();
@@ -316,6 +337,7 @@ class Plugin {
 	String name;
 	int x, y, index;
 	int instrument, note;
+	boolean beingInspected;
 	
 	public Plugin(String name, int index) {
 		this.name = name;
@@ -335,11 +357,14 @@ class Plugin {
 		chooseNote();
 	}
 
-	public static void clear() {
+	public static void clearInstruments() {
 		for (Plugin plugin: plugins.values()) {
 			plugin.instrument = -1;
 		}
-		// plugins.clear();
+	}
+	
+	public static void clear() {		
+		plugins.clear();
 	}
 
 	public static void updateInstruments() {
@@ -360,17 +385,16 @@ class Plugin {
 		}
 	}
 	
-	public static void select(int x, int y) {
+	public static boolean select(int x, int y) {
 		selectedPlugin = null;
 		for (Plugin plugin : plugins.values()) {
 			if (plugin.inside(x, y)) {
 				selectedPlugin = plugin;
-				if (plugin.instrument != -1) {
-					UI.instrumentSelector.setSelectedItem(SoundTheme.instruments[plugin.instrument]);
-				}
-				break;
+				UI.instrumentSelector.setSelectedIndex(plugin.instrument + 1);
+				return true;
 			}
 		}
+		return false;
 	}
 	
 	private boolean inside(int ex, int ey) {
@@ -403,6 +427,11 @@ class Plugin {
 		if (instrument != -1) {
 			g.setColor(numberColor);
 			g.drawString(String.format("%d", instrument), x + UI.PLUGIN_SIZE/2, y + UI.PLUGIN_SIZE - UI.MARGIN - 3);
+		}
+		if (beingInspected) {
+			g.setColor(Color.YELLOW);
+			g.setStroke(new BasicStroke(2));
+			g.fillOval(x + 15, y + UI.PLUGIN_SIZE - UI.MARGIN - 13, 10, 10);
 		}
 	}
 	
@@ -441,19 +470,52 @@ class Plugin {
 
 /**
  * The canvas used to draw plugins on. Mouse clicks enable/disable sounds.
- * 
- * @author Chris Laffra
- *
  */
 @SuppressWarnings("serial")
 class CacophoniaCanvas extends Canvas {  
-    public CacophoniaCanvas() { 
+	    public CacophoniaCanvas() { 
 	    setBackground (Color.BLACK);  
 	    setSize(WIDTH, HEIGHT);  
 	    addMouseListener(new MouseAdapter() {
 	    	@Override
 	    	public void mouseClicked(MouseEvent e) {
-	    		Plugin.select(e.getX(), e.getY());
+	    		if (Plugin.select(e.getX(), e.getY())) {
+	    			super.mouseClicked(e);
+	    			if (e.getButton() != 1) {
+	    				Plugin plugin = Plugin.selectedPlugin;
+	    			    PopupMenu menu = new PopupMenu();
+    					MenuItem inspect = new MenuItem(plugin.beingInspected ? "Stop inspecting this plugin" : "Inspect this plugin");
+	    			    menu.add(inspect);
+    					inspect.addActionListener(new ActionListener() {
+							@Override
+							public void actionPerformed(ActionEvent e) {
+								plugin.beingInspected = !plugin.beingInspected;
+								UI.sendEvent(plugin.beingInspected ? Constants.INSPECT_PLUGIN : Constants.UN_INSPECT_PLUGIN, plugin.name);
+								CacophoniaCanvas.this.remove(menu);
+							}
+						});
+    					MenuItem source = new MenuItem("Import this plugin as source");
+	    			    menu.add(source);
+	    			    source.addActionListener(new ActionListener() {
+							@Override
+							public void actionPerformed(ActionEvent e) {
+								UI.sendEvent(Constants.IMPORT_PLUGIN_FROM_SOURCE, plugin.name);
+								CacophoniaCanvas.this.remove(menu);
+							}
+						});
+    					MenuItem repository = new MenuItem("Import this plugin from repository");
+	    			    menu.add(repository);
+	    			    repository.addActionListener(new ActionListener() {
+							@Override
+							public void actionPerformed(ActionEvent e) {
+								UI.sendEvent(Constants.IMPORT_PLUGIN_FROM_REPOSITORY, plugin.name);
+								CacophoniaCanvas.this.remove(menu);
+							}
+						});
+    					CacophoniaCanvas.this.add(menu);
+	    				menu.show(CacophoniaCanvas.this, e.getX(), e.getY());
+	    			}
+	    		}
 	    	}
 		});
 	}  
@@ -465,9 +527,6 @@ class CacophoniaCanvas extends Canvas {
 
 /**
  * Creates sounds for plugins.
- * 
- * @author Chris Laffra
- *
  */
 class Orchestra {
 	MidiChannel midiChannel;

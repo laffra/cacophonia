@@ -1,17 +1,18 @@
 package cacophonia;
 
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Stack;
 
 /**
  * The Cacophonia runtime that runs inside the instrumentation agent, as part of the Eclipse process.
- * 
- * @author Chris Laffra
- *
  */
 public class Cacophonia {
 	static boolean debug = false;
@@ -31,9 +32,6 @@ public class Cacophonia {
  * 
  * Keeps track of callstacks to determine whether a call is made from one plugin to another. In that case,
  * {@link RemoteUI} is used to send an event to the UI that runs in a different process.
- * 
- * @author Chris Laffra
- *
  */
 class Method {
 	private static Hashtable<String,Method> methods = new Hashtable<String,Method>();
@@ -41,7 +39,9 @@ class Method {
 	private static ThreadLocal<Stack<String>> pluginStack = ThreadLocal.withInitial(() -> new Stack<String>());
 	private static String lastPlugin = "eclipse.main";
 	private static RemoteUI remoteUI = new RemoteUI();
+	private static int callDepth = 0;
 	
+	static HashSet<String> tracedPlugins = new HashSet<String>();
 	String name;
 	int callCount;
 
@@ -67,7 +67,13 @@ class Method {
 	
 	public void enter() {
 		callCount++;
-		if (Cacophonia.debug) System.out.println(String.format("> %d %s %s", callCount, plugin, name));
+		synchronized (tracedPlugins) {
+			if (tracedPlugins.contains(plugin)) {
+				for (int n=0; n<callDepth; n++) System.out.print("    ");
+				System.out.println(String.format("%s (%d calls) {", name, callCount));
+				callDepth++;
+			}
+		}
 		if (!lastPlugin.equals(plugin)) {
 			Stack<String> stack = pluginStack.get();
 			stack.push(plugin);
@@ -77,7 +83,14 @@ class Method {
 	}
 	
 	public void leave() {
-		if (Cacophonia.debug) System.out.println(String.format("< %d %s %s", callCount, plugin, lastPlugin, name));
+		synchronized (tracedPlugins) {
+			if (tracedPlugins.contains(plugin)) {
+				callDepth = Math.max(0,  callDepth - 1);
+				if (callDepth > 32) callDepth = 0;
+				for (int n=0; n<callDepth; n++) System.out.print("    ");
+				System.out.println(String.format("}"));
+			}
+		}
 		if (lastPlugin.equals(plugin)) {
 			Stack<String> stack = pluginStack.get();
 			if (!stack.isEmpty()) lastPlugin = stack.pop();
@@ -92,6 +105,17 @@ class Method {
 		}
 		return method;
 	}
+
+	public static void trace(String plugin, boolean trace) {
+		if (trace) {
+			tracedPlugins.add(plugin);
+			System.out.println("####### Enable tracing for " + plugin);
+		} else {
+			tracedPlugins.remove(plugin);
+			System.out.println("####### Disable tracing for " + plugin);
+		}
+		Method.callDepth = 0;
+	}
 }
 
 
@@ -99,18 +123,19 @@ class Method {
  * Notifies the remote UI, running in a different process, that a call is made between two plugins.
  * 
  * See {@link cacophonia.UI} for the implementation of the remote UI itself.
- * 
- * @author Chris Laffra
  *
  */
 class RemoteUI {
 	Socket socket;
-	DataOutputStream stream;
+	DataInputStream inputStream;
+	DataOutputStream outputStream;
 	
 	public RemoteUI() {
 		try {
 			socket = new Socket("localhost",6666);
-			stream = new DataOutputStream(socket.getOutputStream());  
+			inputStream = new DataInputStream(socket.getInputStream());  
+			outputStream = new DataOutputStream(socket.getOutputStream());  
+			this.setupListener();
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
@@ -118,11 +143,43 @@ class RemoteUI {
 		}  
 	}
 	
+	private void setupListener() {
+		new Thread(new Runnable() {
+			public void run() {
+				while (true) {
+					try {
+						int command = inputStream.readInt();
+						String details = (String)inputStream.readUTF();
+						switch (command) {
+						case Constants.INSPECT_PLUGIN:
+							Method.trace(details, true);
+							break;
+						case Constants.UN_INSPECT_PLUGIN:
+							Method.trace(details, false);
+							break;
+						case Constants.IMPORT_PLUGIN_FROM_SOURCE:
+						case Constants.IMPORT_PLUGIN_FROM_REPOSITORY:
+							System.out.println("Importing of plugins is not yet implemented.");
+							System.out.println("Please import by hand: " + details);
+							break;
+						case Constants.EXIT:
+							System.exit(0);
+							break;
+						}
+					} catch (Exception e) {
+						System.err.println(e);
+						System.exit(1);
+					}
+				}
+			}
+		}).start();
+	}
+	
 	public void sendEvent(String message) {
 		try {
 			synchronized (socket) {
-				stream.writeUTF(message);
-				stream.flush(); 
+				outputStream.writeUTF(message);
+				outputStream.flush(); 
 			}
 		} catch (Exception e) {
 			if (Cacophonia.debug) e.printStackTrace();
@@ -131,7 +188,7 @@ class RemoteUI {
 	
 	void close() {
 		try {
-			stream.close();
+			outputStream.close();
 			socket.close();   
 		} catch (Exception e) {
 			e.printStackTrace();

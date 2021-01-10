@@ -29,8 +29,6 @@ import javassist.NotFoundException;
   * <li> <tt>manifest.txt</tt>: Used by <tt>build_agent.sh</tt> to create the agent jar.
   * <li> <tt>javassist.3.27.0.jar</tt>: The bytecode instrumentation packages used by the agent.
   * </ul>
-  * 
-  * @author Chris Laffra
   */
 public class Agent {
 	static String jarPath = System.getProperty("user.home") + "/cacophonia.1.0.0.jar";
@@ -67,9 +65,6 @@ public class Agent {
 
 /**
  * Transformer instruments each method with calls to the Cacopohonia runtime to inform it on enter/leave events.
- *  
- * @author Chris Laffra
- *
  */
 class Transformer implements ClassFileTransformer {
 	int classLoadCount;
@@ -151,9 +146,6 @@ class Transformer implements ClassFileTransformer {
 /**
  * 
  * A subclass of Javassist's ClassPool to handle package fragments.
- * 
- * @author Chris Laffra
- *
  */
 class CacophoniaClassPool extends ClassPool {
 	ClassPool defaultClassPool = ClassPool.getDefault();
