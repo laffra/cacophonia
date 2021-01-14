@@ -8,6 +8,7 @@ import java.awt.Canvas;
 import java.awt.Checkbox;
 import java.awt.Choice;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Composite;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -17,7 +18,6 @@ import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.Label;
 import java.awt.MenuItem;
-import java.awt.MouseInfo;
 import java.awt.PopupMenu;
 import java.awt.TextField;
 import java.awt.event.ActionEvent;
@@ -31,24 +31,30 @@ import java.awt.event.TextListener;
 import java.awt.image.BufferedImage;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import javax.sound.midi.Instrument;
 import javax.sound.midi.MidiChannel;
 import javax.sound.midi.MidiSystem;
 import javax.sound.midi.MidiUnavailableException;
 import javax.sound.midi.Synthesizer;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JSlider;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
 
 /**
@@ -62,32 +68,48 @@ import javax.swing.JFrame;
  */
 public class UI {
 	static CacophoniaCanvas canvas;
-	static int WIDTH = 1200;
-	static int HEIGHT = 1200;
-	static int PLUGINS_PER_ROW = 13;
-	static int MARGIN = 5;
-	static int PLUGIN_SIZE = 90;
-	static int REDRAW_DELAY = 150; 
-	static int MUTE_DELAY = 1500;
-	static int HEART_BEAT = 3;
-	static boolean muted = true;
-	static boolean manual = false;
 	static Orchestra orchestra = new Orchestra();
+
+	static final int WIDTH = 1200;
+	static final int HEIGHT = 1200;
+	static final int PLUGINS_PER_ROW = 13;
+	static final int MARGIN = 5;
+	static final int PLUGIN_SIZE = 90;
+	static final int REDRAW_DELAY = 150; 
+	static final int HISTORY_SECONDS = 60; 
+	static final int HISTORY_SAMPLES_PER_SECOND = 1000 / REDRAW_DELAY; 
+	static final int HISTORY_SIZE = HISTORY_SECONDS * HISTORY_SAMPLES_PER_SECOND; 
+	static final int HISTORY_SLIDER_SIZE = HISTORY_SIZE / 2;
+	static final int HISTORY_INCREMENT = 2;
+	static final int MUTE_DELAY = 1500;
+	static final int HEART_BEAT = 3;
 	
 	static Image drawing = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB);
 	static HashMap<String, Boolean> called = new HashMap<>();
 	static HashMap<String, Integer> scores = new HashMap<>();
-	protected static int instrumentStartNumber;
+	static List<HashMap<String, Integer>> history = new ArrayList<HashMap<String, Integer>>();
+	static int instrumentStartNumber;
 	static JComboBox<Object> instrumentSelector;
+	static JLabel time;
 	static DataOutputStream eventStream;
 	static String pluginFilter = "";
-
+	static boolean live = true;
+	static int historyIndex;
+	static boolean muted = true;
+	static boolean manual = false;
+	static Date historyFrozen = new Date();
+	
 
 	public static void main(String args[]) {
-		setupListener();
-    	createUI();
-	    updateDisplay();
-		setupRedrawLoop();
+		try {
+			setupListener();
+	    	createUI();
+			initHistory();
+		    updateDisplay();
+			setupRedrawLoop();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 	
 	private static void setupRedrawLoop() {
@@ -97,11 +119,11 @@ public class UI {
 					try {
 						Thread.sleep(REDRAW_DELAY);
 						synchronized (called) {
-							updateScores();
+							if (live) updateScores();
 							updateDisplay();
+							if (live) updateHistory();
 						}
 					} catch (Exception e) {
-						System.err.println(e);
 						e.printStackTrace();
 					}
 				}
@@ -125,15 +147,18 @@ public class UI {
 									called.put(pluginToPlugin, true);
 								}
 							}
-						} catch(EOFException e) {
-							serverSocket.close();
-							System.exit(0);
 						} catch (Exception e) {
-							System.err.println(e);
+							serverSocket.close();
+							System.out.println("Exit UI");
+							System.out.flush();
+							e.printStackTrace();
+							System.err.flush();
+							System.exit(0);
 						}
 					}
 				} catch(Exception e) {
 					e.printStackTrace();
+					System.err.flush();
 				}  
 			}
 		}).start();
@@ -148,7 +173,7 @@ public class UI {
 		}
 	}
 	
-	protected static void updateScores() {
+	private static void updateScores() {
 	    for (Map.Entry<String,Boolean> entry : called.entrySet()) {
 	    	String key = entry.getKey();
 	    	boolean value = entry.getValue();
@@ -160,7 +185,7 @@ public class UI {
 	    }
 	}
 	
-	protected static void updateDisplay() {
+	private static void updateDisplay() {
 		drawing = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB);
 	    Graphics2D g = (Graphics2D) drawing.getGraphics();
 	    Plugin.drawAll((Graphics2D) g);
@@ -170,6 +195,21 @@ public class UI {
 	    g.dispose();
     	canvas.repaint();
 	}
+	
+	private static void initHistory() {
+		for (int n=0; n<HISTORY_SIZE; n++) {
+			history.add(new HashMap<String,Integer>());
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static void updateHistory() {
+	    scores.entrySet().removeIf(entry -> entry.getValue() == 0);
+	    history.remove(0);
+	    history.add((HashMap<String,Integer>)scores.clone());
+	    updateTime();
+	}
+	
 	
 	static void updateDrawing(Graphics2D g, boolean drawLine) {
 	    for (Map.Entry<String,Integer> entry : scores.entrySet()) {
@@ -181,7 +221,10 @@ public class UI {
 	    	Plugin to = Plugin.get(pluginNames[1]);
 	    	if (drawLine) {
 		    	from.drawLineTo(to, value, g);
-		    	scores.put(key, Math.max(value - 1, 0));
+		    	if (live) {
+			    	value = Math.max(value - 1, 0);
+			    	scores.put(key, value);
+		    	}
 	    	} else {
 	    		from.highlight(g);
 	    		to.highlight(g);
@@ -195,21 +238,68 @@ public class UI {
 		Container mainContainer = frame.getContentPane();
 		mainContainer.setLayout(new BorderLayout());
 		
+		Container header = createHeader();
+		header.add(createThemeUI());
+		header.add(new Label("|"));
+		header.add(createManualUI());
+		header.add(new Label("|"));
+		header.add(createFilterUI());
+		header.add(new Label("|"));
+		header.add(createHistoryUI());
+		mainContainer.add(header, BorderLayout.NORTH);
+
+		canvas = new CacophoniaCanvas();
+		mainContainer.add(canvas, BorderLayout.CENTER);
+		
+		frame.setLocation(2300, 5);
+		frame.setSize(WIDTH, HEIGHT);
+		frame.setVisible(true);
+	}
+
+	private static Component createFilterUI() {
+		Container container = new Container();
+		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
+		Button clear = new Button("clear");
+		clear.addActionListener(new ActionListener() {			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				Plugin.clear();
+			}
+		});
+		container.add(clear);
+		container.add(new Label("filter:"));
+		TextField filter = new TextField(16);
+		filter.addTextListener(new TextListener() {	
+			@Override
+			public void textValueChanged(TextEvent e) {
+				UI.pluginFilter = filter.getText();
+			}
+		});
+		container.add(filter);
+		return container;
+	}
+
+	private static Container createHeader() {
 		Container header = new Container();
 		header.setPreferredSize(new Dimension(800, 40));
 		header.setLayout(new FlowLayout(FlowLayout.CENTER, 15, 5));
 		header.setPreferredSize(new Dimension(WIDTH,40));
-		Checkbox checkbox = new Checkbox("mute", true);
-		checkbox.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				UI.muted = !checkbox.getState();
+		return header;
+	}
+
+	private static Component createThemeUI() {
+		Container container = new Container();
+		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
+		JCheckBox checkbox = new JCheckBox("mute", true);
+		checkbox.addChangeListener(new ChangeListener() {
+			public void stateChanged(ChangeEvent e) {
+				UI.muted = checkbox.isSelected();
 				if (UI.muted) {
 					UI.orchestra.allNotesOff();
 				}
 			}
 		});
-		header.add(checkbox);
+		container.add(checkbox);
 		Choice themeChooser = new Choice();
 		for (SoundTheme theme: SoundTheme.getAllThemes()) {
 			themeChooser.add(theme.name);  
@@ -221,8 +311,11 @@ public class UI {
 				Plugin.updateInstruments();
 			}
 		});
-		header.add(themeChooser);
-		header.add(new Label("|"));
+		container.add(themeChooser);
+		return container;
+	}
+
+	private static Component createManualUI() {
 		Checkbox manual = new Checkbox("manual", false);
 		manual.addMouseListener(new MouseAdapter() {
 			@Override
@@ -231,7 +324,6 @@ public class UI {
 				Plugin.clearInstruments();
 			}
 		});
-		header.add(manual);
 		List<String> instrumentNames = new ArrayList<String>();
 		instrumentNames.add("None");
 		for (int n=0; n<SoundTheme.instruments.length; n++) {
@@ -269,42 +361,84 @@ public class UI {
 				}
 			}
 		});
-		Container instrumentContainer = new Container();
-		instrumentContainer.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
-		instrumentContainer.add(previous);
-		instrumentContainer.add(instrumentSelector);
-		instrumentContainer.add(next);
-		header.add(instrumentContainer);
-		mainContainer.add(header, BorderLayout.NORTH);
+		Container container = new Container();
+		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
+		container.add(manual);
+		container.add(previous);
+		container.add(instrumentSelector);
+		container.add(next);
+		return container;
+	}
+	
+	private static void updateTime() {
+		Date date = new Date();
+		if (!live) {
+			int secondsBack = HISTORY_SECONDS - historyIndex * HISTORY_SECONDS / HISTORY_SIZE;
+			Calendar calendar=Calendar.getInstance();
+			calendar.setTime(historyFrozen);
+			calendar.set(Calendar.SECOND, calendar.get(Calendar.SECOND) - secondsBack);
+			date = calendar.getTime();
+		}
+		time.setText(new SimpleDateFormat("HH:mm:ss").format(date));
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static void windBackTime(JSlider slider, JCheckBox live, int index) {
+		slider.setValue(index);
+		historyIndex = slider.getValue();
+		if (UI.live) historyFrozen = new Date();
+		live.setSelected(false);
+		UI.live = false;
+		updateTime();
+		HashMap<String,Integer>historyScores = new HashMap<String,Integer>();
+		for (int n=0; n<HISTORY_SAMPLES_PER_SECOND; n++) {
+			if (historyIndex + n < HISTORY_SIZE) {
+				HashMap<String,Integer> sample = (HashMap<String,Integer>)history.get(historyIndex + n);
+				historyScores.putAll(sample);
+			}
+		}
+		scores = historyScores;
+	}
 
-		header.add(new Label("|"));
-		Button clear = new Button("clear");
-		clear.addActionListener(new ActionListener() {			
-			@Override
+	private static Component createHistoryUI() {		
+		JCheckBox live = new JCheckBox("live", true);
+		Button previous = new Button("<");
+		previous.setPreferredSize(new Dimension(25, 20));
+		Button next = new Button(">");
+		next.setPreferredSize(new Dimension(25, 20));
+		JSlider slider = new JSlider(JSlider.HORIZONTAL, 0, HISTORY_SIZE, HISTORY_SIZE);
+		time = new JLabel();
+		time.setPreferredSize(new Dimension(65, 30));
+		live.addChangeListener(new ChangeListener() {
+			public void stateChanged(ChangeEvent e) {
+				slider.setValue(HISTORY_SIZE);
+				UI.live = live.isSelected();
+			}
+		});
+		previous.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				Plugin.clear();
+				windBackTime(slider, live, slider.getValue() - 1);
 			}
 		});
-		header.add(clear);
-		Container filterContainer = new Container();
-		filterContainer.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
-		filterContainer.add(new Label("filter:"));
-		TextField filter = new TextField(16);
-		filter.addTextListener(new TextListener() {	
-			@Override
-			public void textValueChanged(TextEvent e) {
-				UI.pluginFilter = filter.getText();
+		next.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				windBackTime(slider, live, slider.getValue() + 1);
 			}
 		});
-		filterContainer.add(filter);
-		header.add(filterContainer);
-		
-		canvas = new CacophoniaCanvas();
-		mainContainer.add(canvas, BorderLayout.CENTER);
-		
-		frame.setLocation(2300, 5);
-		frame.setSize(WIDTH, HEIGHT);
-		frame.setVisible(true);
+		slider.addChangeListener(new ChangeListener() {
+			public void stateChanged(ChangeEvent e) {
+				windBackTime(slider, live, slider.getValue());
+ 			}
+		});
+		slider.setPreferredSize(new Dimension(80, 30));
+		Container container = new Container();
+		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
+		container.add(time);
+		container.add(previous);
+		container.add(slider);
+		container.add(next);
+		container.add(live);		
+		return container;
 	}  
 }
 
@@ -494,7 +628,6 @@ class Plugin {
 /**
  * The canvas used to draw plugins on. Mouse clicks enable/disable sounds.
  */
-@SuppressWarnings("serial")
 class CacophoniaCanvas extends Canvas {  
 	    public CacophoniaCanvas() { 
 	    setBackground (Color.BLACK);  

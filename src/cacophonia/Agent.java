@@ -48,10 +48,13 @@ public class Agent {
         instrumentation.addTransformer(new Transformer());
 	}
 
-	private static void loadRemoteUI() throws IOException {
+	private static void loadRemoteUI() throws Exception {
     	System.out.println("Cacophonia is now running...");
     	System.out.println("Loading Cacophonia UI...");
-        new ProcessBuilder("java", "-classpath", jarPath, "cacophonia.UI").start();
+        ProcessBuilder process = new ProcessBuilder("java", "-classpath", jarPath, "cacophonia.UI");
+        process.inheritIO();
+        process.start();
+        Thread.sleep(1000);
 	}
 
 	static void setup() {

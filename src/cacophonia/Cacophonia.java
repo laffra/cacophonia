@@ -148,6 +148,7 @@ class RemoteUI {
 			public void run() {
 				while (true) {
 					try {
+						Thread.sleep(200);
 						int command = inputStream.readInt();
 						String details = (String)inputStream.readUTF();
 						switch (command) {
@@ -167,7 +168,7 @@ class RemoteUI {
 							break;
 						}
 					} catch (Exception e) {
-						System.err.println(e);
+						e.printStackTrace();
 						System.exit(1);
 					}
 				}
@@ -182,7 +183,7 @@ class RemoteUI {
 				outputStream.flush(); 
 			}
 		} catch (Exception e) {
-			if (Cacophonia.debug) e.printStackTrace();
+			e.printStackTrace();
 		}  
 	}
 	
