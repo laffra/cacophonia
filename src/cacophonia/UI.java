@@ -34,7 +34,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -52,7 +51,7 @@ import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.JSlider;
+import javax.swing.JPanel;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -98,6 +97,8 @@ public class UI {
 	static boolean muted = true;
 	static boolean manual = false;
 	static Date historyFrozen = new Date();
+	static boolean overrideBeep = false;
+	static TimeTravelerBar timeTravelerBar;
 	
 
 	public static void main(String args[]) {
@@ -122,6 +123,7 @@ public class UI {
 							if (live) updateScores();
 							updateDisplay();
 							if (live) updateHistory();
+							overrideBeep = false;
 						}
 					} catch (Exception e) {
 						e.printStackTrace();
@@ -194,6 +196,7 @@ public class UI {
 	    updateDrawing(g, true);
 	    g.dispose();
     	canvas.repaint();
+    	timeTravelerBar.repaint();
 	}
 	
 	private static void initHistory() {
@@ -382,10 +385,9 @@ public class UI {
 		time.setText(new SimpleDateFormat("HH:mm:ss").format(date));
 	}
 	
-	@SuppressWarnings("unchecked")
-	private static void windBackTime(JSlider slider, JCheckBox live, int index) {
-		slider.setValue(index);
-		historyIndex = slider.getValue();
+	private static void windBackTime(JCheckBox live, int index) {
+		timeTravelerBar.setValue(index);
+		historyIndex = timeTravelerBar.getValue();
 		if (UI.live) historyFrozen = new Date();
 		live.setSelected(false);
 		UI.live = false;
@@ -398,45 +400,29 @@ public class UI {
 			}
 		}
 		scores = historyScores;
+		overrideBeep = true;
 	}
 
 	private static Component createHistoryUI() {		
 		JCheckBox live = new JCheckBox("live", true);
-		Button previous = new Button("<");
-		previous.setPreferredSize(new Dimension(25, 20));
-		Button next = new Button(">");
-		next.setPreferredSize(new Dimension(25, 20));
-		JSlider slider = new JSlider(JSlider.HORIZONTAL, 0, HISTORY_SIZE, HISTORY_SIZE);
+		timeTravelerBar = new TimeTravelerBar();
 		time = new JLabel();
 		time.setPreferredSize(new Dimension(65, 30));
 		live.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
-				slider.setValue(HISTORY_SIZE);
+				timeTravelerBar.setValue(HISTORY_SIZE);
 				UI.live = live.isSelected();
 			}
 		});
-		previous.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				windBackTime(slider, live, slider.getValue() - 1);
-			}
-		});
-		next.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				windBackTime(slider, live, slider.getValue() + 1);
-			}
-		});
-		slider.addChangeListener(new ChangeListener() {
+		timeTravelerBar.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
-				windBackTime(slider, live, slider.getValue());
+				windBackTime(live, timeTravelerBar.getValue());
  			}
 		});
-		slider.setPreferredSize(new Dimension(80, 30));
 		Container container = new Container();
 		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
 		container.add(time);
-		container.add(previous);
-		container.add(slider);
-		container.add(next);
+		container.add(timeTravelerBar);
 		container.add(live);		
 		return container;
 	}  
@@ -605,7 +591,8 @@ class Plugin {
 		g.drawLine(x + offset, y + offset, other.x + offset, other.y + offset);
 		g.setComposite(opaque);
 
-		if (weight == UI.HEART_BEAT) {
+		if (weight == UI.HEART_BEAT || UI.overrideBeep) {
+			this.beep();
 			other.beep();
 		}
 	}
@@ -626,10 +613,61 @@ class Plugin {
 
 
 /**
+ * A component that shows the plugins active in the past and allows the user to select a point in time to explore.
+ */
+class TimeTravelerBar extends JPanel {
+	private static final int TIME_TRAVELER_WIDTH = 120;
+	private static final int TIME_TRAVELER_HEIGHT = 30;
+	private int value;
+	private ChangeListener listener;
+	
+	public TimeTravelerBar() {
+		setBackground (Color.BLACK);  
+	    setPreferredSize(new Dimension(TIME_TRAVELER_WIDTH, TIME_TRAVELER_HEIGHT));  
+	    addMouseMotionListener(new MouseAdapter() {
+	    	public void mouseMoved(MouseEvent e) {
+	    		value = e.getX() * UI.HISTORY_SIZE / TIME_TRAVELER_WIDTH;
+	    		repaint();
+    			listener.stateChanged(null);
+	    	}
+	    });
+	}
+    public void addChangeListener(ChangeListener listener) {
+		this.listener = listener;
+	}
+	public void setValue(int value) {
+		this.value = value;
+	}
+	public int getValue() {
+		return value;
+	}
+	public void paintComponent(Graphics graphics) { 
+		Graphics2D g = (Graphics2D)graphics;
+    	int index = 0;
+    	g.setStroke(new BasicStroke(4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+		g.setColor(Color.RED);
+        for (HashMap<String, Integer> scores: UI.history) {
+        	if (scores.size() > 0) {
+        		int x = TIME_TRAVELER_WIDTH * index / UI.HISTORY_SIZE;
+        		int h = 5 * (int)Math.log(scores.size());
+            	g.drawLine(x, TIME_TRAVELER_HEIGHT - h, x, TIME_TRAVELER_HEIGHT);
+        	}
+        	index += 1;
+        }
+    	g.setColor(Color.YELLOW);
+    	g.setStroke(new BasicStroke(1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+    	int x = TIME_TRAVELER_WIDTH * value / UI.HISTORY_SIZE;
+    	g.drawLine(x, 0, x, TIME_TRAVELER_HEIGHT);
+	} 
+}
+
+
+
+/**
  * The canvas used to draw plugins on. Mouse clicks enable/disable sounds.
  */
 class CacophoniaCanvas extends Canvas {  
-	    public CacophoniaCanvas() { 
+	public CacophoniaCanvas() { 
 	    setBackground (Color.BLACK);  
 	    setSize(WIDTH, HEIGHT);  
 	    addMouseListener(new MouseAdapter() {
