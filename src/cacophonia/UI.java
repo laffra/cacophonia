@@ -620,10 +620,13 @@ class TimeTravelerBar extends JPanel {
 	private static final int TIME_TRAVELER_HEIGHT = 30;
 	private int value;
 	private ChangeListener listener;
+	private Image drawing = new BufferedImage(TIME_TRAVELER_WIDTH, TIME_TRAVELER_HEIGHT, BufferedImage.TYPE_INT_ARGB);
+	private long lastDraw;
+	
 	
 	public TimeTravelerBar() {
 		setBackground (Color.BLACK);  
-	    setPreferredSize(new Dimension(TIME_TRAVELER_WIDTH, TIME_TRAVELER_HEIGHT));  
+	    setPreferredSize(new Dimension(TIME_TRAVELER_WIDTH, TIME_TRAVELER_HEIGHT));
 	    addMouseMotionListener(new MouseAdapter() {
 	    	public void mouseMoved(MouseEvent e) {
 	    		value = e.getX() * UI.HISTORY_SIZE / TIME_TRAVELER_WIDTH;
@@ -641,9 +644,17 @@ class TimeTravelerBar extends JPanel {
 	public int getValue() {
 		return value;
 	}
+	public void repaint() { 
+		long now = System.currentTimeMillis();
+		if (now - lastDraw < 1000) return;
+		lastDraw = now;
+		super.repaint();
+	}
 	public void paintComponent(Graphics graphics) { 
-		Graphics2D g = (Graphics2D)graphics;
-    	int index = 0;
+		Graphics2D g = (Graphics2D) drawing.getGraphics();
+	    int index = 0;
+		g.setColor(Color.BLACK);
+		g.fillRect(0, 0, TIME_TRAVELER_WIDTH, TIME_TRAVELER_HEIGHT);
     	g.setStroke(new BasicStroke(4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 		g.setColor(Color.RED);
         for (HashMap<String, Integer> scores: UI.history) {
@@ -658,6 +669,7 @@ class TimeTravelerBar extends JPanel {
     	g.setStroke(new BasicStroke(1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
     	int x = TIME_TRAVELER_WIDTH * value / UI.HISTORY_SIZE;
     	g.drawLine(x, 0, x, TIME_TRAVELER_HEIGHT);
+    	graphics.drawImage(drawing, 0, 0, this);
 	} 
 }
 
@@ -714,7 +726,7 @@ class CacophoniaCanvas extends Canvas {
 		});
 	}  
     public void paint(Graphics g) { 
-        g.drawImage(UI.drawing, 0, 0, this);
+    	g.drawImage(UI.drawing, 0, 0, this);
 	}  
 }
 
