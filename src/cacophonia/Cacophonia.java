@@ -2,9 +2,7 @@ package cacophonia;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.HashSet;
@@ -129,7 +127,7 @@ class RemoteUI {
 	Socket socket;
 	DataInputStream inputStream;
 	DataOutputStream outputStream;
-	
+
 	public RemoteUI() {
 		try {
 			socket = new Socket("localhost",6666);
@@ -160,8 +158,7 @@ class RemoteUI {
 							break;
 						case Constants.IMPORT_PLUGIN_FROM_SOURCE:
 						case Constants.IMPORT_PLUGIN_FROM_REPOSITORY:
-							System.out.println("Importing of plugins is not yet implemented.");
-							System.out.println("Please import by hand: " + details);
+							System.err.println("Plugin import not implemented. Manually import " + details);
 							break;
 						case Constants.EXIT:
 							System.exit(0);
@@ -196,4 +193,3 @@ class RemoteUI {
 		}  
 	}
 }
-

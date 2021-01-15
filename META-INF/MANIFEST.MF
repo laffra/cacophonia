@@ -5,7 +5,9 @@ Bundle-SymbolicName: cacophonia;singleton:=true
 Bundle-Version: 1.0.0.qualifier
 Bundle-Vendor: ChrisLaffra
 Require-Bundle: org.eclipse.core.runtime,
- org.eclipse.ui
+ org.eclipse.ui,
+ org.eclipse.pde.ui;bundle-version="3.12.100",
+ org.eclipse.core.resources;bundle-version="3.13.900"
 Bundle-RequiredExecutionEnvironment: JavaSE-15
 Import-Package: javax.inject
 Automatic-Module-Name: cacophonia

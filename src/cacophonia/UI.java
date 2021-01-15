@@ -98,7 +98,7 @@ public class UI {
 	static boolean manual = false;
 	static Date historyFrozen = new Date();
 	static boolean overrideBeep = false;
-	static TimeTravelerBar timeTravelerBar;
+	static FluxController fluxController;
 	
 
 	public static void main(String args[]) {
@@ -196,7 +196,7 @@ public class UI {
 	    updateDrawing(g, true);
 	    g.dispose();
     	canvas.repaint();
-    	timeTravelerBar.repaint();
+    	fluxController.repaint();
 	}
 	
 	private static void initHistory() {
@@ -271,7 +271,7 @@ public class UI {
 		});
 		container.add(clear);
 		container.add(new Label("filter:"));
-		TextField filter = new TextField(16);
+		TextField filter = new TextField(10);
 		filter.addTextListener(new TextListener() {	
 			@Override
 			public void textValueChanged(TextEvent e) {
@@ -385,9 +385,9 @@ public class UI {
 		time.setText(new SimpleDateFormat("HH:mm:ss").format(date));
 	}
 	
-	private static void windBackTime(JCheckBox live, int index) {
-		timeTravelerBar.setValue(index);
-		historyIndex = timeTravelerBar.getValue();
+	private static void travelBackInTime(JCheckBox live, int index) {
+		fluxController.setValue(index);
+		historyIndex = fluxController.getValue();
 		if (UI.live) historyFrozen = new Date();
 		live.setSelected(false);
 		UI.live = false;
@@ -405,24 +405,40 @@ public class UI {
 
 	private static Component createHistoryUI() {		
 		JCheckBox live = new JCheckBox("live", true);
-		timeTravelerBar = new TimeTravelerBar();
+		fluxController = new FluxController();
 		time = new JLabel();
 		time.setPreferredSize(new Dimension(65, 30));
+		Button previous = new Button("<");
+		previous.setPreferredSize(new Dimension(25, 20));
+		previous.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				travelBackInTime(live, fluxController.getValue() - 1);
+			}
+		});
+		Button next = new Button(">");
+		next.setPreferredSize(new Dimension(25, 20));
+		next.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				travelBackInTime(live, fluxController.getValue() + 2);
+			}
+		});
 		live.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
-				timeTravelerBar.setValue(HISTORY_SIZE);
+				fluxController.setValue(HISTORY_SIZE);
 				UI.live = live.isSelected();
 			}
 		});
-		timeTravelerBar.addChangeListener(new ChangeListener() {
+		fluxController.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
-				windBackTime(live, timeTravelerBar.getValue());
+				travelBackInTime(live, fluxController.getValue());
  			}
 		});
 		Container container = new Container();
 		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
 		container.add(time);
-		container.add(timeTravelerBar);
+		container.add(previous);
+		container.add(fluxController);
+		container.add(next);
 		container.add(live);		
 		return container;
 	}  
@@ -615,7 +631,7 @@ class Plugin {
 /**
  * A component that shows the plugins active in the past and allows the user to select a point in time to explore.
  */
-class TimeTravelerBar extends JPanel {
+class FluxController extends JPanel {
 	private static final int TIME_TRAVELER_WIDTH = 120;
 	private static final int TIME_TRAVELER_HEIGHT = 30;
 	private int value;
@@ -624,7 +640,7 @@ class TimeTravelerBar extends JPanel {
 	private long lastDraw;
 	
 	
-	public TimeTravelerBar() {
+	public FluxController() {
 		setBackground (Color.BLACK);  
 	    setPreferredSize(new Dimension(TIME_TRAVELER_WIDTH, TIME_TRAVELER_HEIGHT));
 	    addMouseMotionListener(new MouseAdapter() {
@@ -655,22 +671,40 @@ class TimeTravelerBar extends JPanel {
 	    int index = 0;
 		g.setColor(Color.BLACK);
 		g.fillRect(0, 0, TIME_TRAVELER_WIDTH, TIME_TRAVELER_HEIGHT);
-    	g.setStroke(new BasicStroke(4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+    	g.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 		g.setColor(Color.RED);
         for (HashMap<String, Integer> scores: UI.history) {
         	if (scores.size() > 0) {
         		int x = TIME_TRAVELER_WIDTH * index / UI.HISTORY_SIZE;
         		int h = 5 * (int)Math.log(scores.size());
             	g.drawLine(x, TIME_TRAVELER_HEIGHT - h, x, TIME_TRAVELER_HEIGHT);
+            	if (UI.manual && hasSound(scores)) {
+            		g.setColor(Color.YELLOW);
+            		g.drawRect(x - 1, TIME_TRAVELER_HEIGHT - h - 1, 3, 3);
+            		g.setColor(Color.RED);        		
+            	}
         	}
         	index += 1;
         }
-    	g.setColor(Color.YELLOW);
+    	g.setColor(Color.ORANGE);
     	g.setStroke(new BasicStroke(1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
     	int x = TIME_TRAVELER_WIDTH * value / UI.HISTORY_SIZE;
     	g.drawLine(x, 0, x, TIME_TRAVELER_HEIGHT);
     	graphics.drawImage(drawing, 0, 0, this);
 	} 
+	private boolean hasSound(Map<String,Integer> scores) {
+		for (Map.Entry<String,Integer> entry : scores.entrySet()) {
+	    	String key = entry.getKey();
+	    	int value = entry.getValue();
+	    	if (value == 0) continue;
+	    	String pluginNames[] = key.split(" ");
+	    	Plugin from = Plugin.get(pluginNames[0]);
+	    	Plugin to = Plugin.get(pluginNames[1]);
+	    	if (from.instrument != -1) return true;
+	    	if (to.instrument != -1) return true;
+	    }
+		return false;
+	}
 }
 
 
