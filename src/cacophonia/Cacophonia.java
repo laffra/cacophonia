@@ -3,11 +3,14 @@ package cacophonia;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Stack;
+
 
 /**
  * The Cacophonia runtime that runs inside the instrumentation agent, as part of the Eclipse process.
@@ -41,16 +44,18 @@ class Method {
 	
 	static HashSet<String> tracedPlugins = new HashSet<String>();
 	String name;
+	String fileName = "???";
 	int callCount;
+	Field fields[];
 
-	private String plugin;
+	private String plugin = "???";
 	
 	public static void enter(String methodName, Object object) {
-		findMethod(methodName, object).enter();
+		findMethod(methodName, object).enter(object);
 	}
 
 	public static void leave(String methodName, Object object) {
-		findMethod(methodName, object).leave();
+		findMethod(methodName, object).leave(object);
 	}
 		
 	public Method(String name, Object object) {
@@ -58,29 +63,46 @@ class Method {
 		try {
 			ClassLoader classLoader = object.getClass().getClassLoader();
 			plugin = classLoader.toString().split("\\[")[1].split(":")[0];
+			String[] nameParts = object.getClass().getName().split("\\.");
+			fileName = nameParts[nameParts.length - 1].split("\\$")[0] + ".java";
+			fields = object.getClass().getDeclaredFields();
 		} catch(Exception e) {
-			plugin = object.getClass().getName();
+			plugin = fileName = object.getClass().getName();
 		}
 	}
 	
-	public void enter() {
+	public void enter(Object object) {
 		callCount++;
 		synchronized (tracedPlugins) {
 			if (tracedPlugins.contains(plugin)) {
+				if (callDepth == 0) System.out.println(new Date());
 				for (int n=0; n<callDepth; n++) System.out.print("    ");
-				System.out.println(String.format("%s (%d calls) {", name, callCount));
+				System.out.println(String.format("at %s(%s:1) - %d calls {", name, fileName, callCount));
 				callDepth++;
+				for (Field field : fields) {
+				    field.setAccessible(true);
+				    Object value;
+					try {
+						value = field.get(object);
+						Object printableValue = field.getType().isPrimitive() ? value : object.getClass().getName();
+						String fieldDetail = field.getName() + "=" + printableValue;
+				    	for (int n=0; n<callDepth; n++) System.out.print("    ");
+						System.out.println(fieldDetail);
+					} catch (IllegalArgumentException | IllegalAccessException e) {
+						// ignore
+					} 
+				}
 			}
+			if (!lastPlugin.equals(plugin)) {
+				Stack<String> stack = pluginStack.get();
+				stack.push(plugin);
+				remoteUI.sendEvent(String.format("%s %s", lastPlugin, plugin));
+			}
+			lastPlugin = plugin;
 		}
-		if (!lastPlugin.equals(plugin)) {
-			Stack<String> stack = pluginStack.get();
-			stack.push(plugin);
-			remoteUI.sendEvent(String.format("%s %s", lastPlugin, plugin));
-		}
-		lastPlugin = plugin;
 	}
 	
-	public void leave() {
+	public void leave(Object object) {
 		synchronized (tracedPlugins) {
 			if (tracedPlugins.contains(plugin)) {
 				callDepth = Math.max(0,  callDepth - 1);
@@ -88,10 +110,10 @@ class Method {
 				for (int n=0; n<callDepth; n++) System.out.print("    ");
 				System.out.println(String.format("}"));
 			}
-		}
-		if (lastPlugin.equals(plugin)) {
-			Stack<String> stack = pluginStack.get();
-			if (!stack.isEmpty()) lastPlugin = stack.pop();
+			if (lastPlugin.equals(plugin)) {
+				Stack<String> stack = pluginStack.get();
+				if (!stack.isEmpty()) lastPlugin = stack.pop();
+			}
 		}
 	}
 

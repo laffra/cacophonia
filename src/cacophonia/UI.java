@@ -521,6 +521,9 @@ class Plugin {
 	}
 	
 	public static void clear() {		
+		for (Plugin plugin: plugins.values()) {
+			plugin.setInspect(false);
+		}
 		plugins.clear();
 	}
 
@@ -624,6 +627,16 @@ class Plugin {
 				UI.orchestra.noteOff(note);
 			}
 		}).start();
+	}
+
+	public void toggleInspect() {
+		setInspect(!beingInspected);
+	}
+
+	public void setInspect(boolean inspect) {
+		if (beingInspected == inspect) return;
+		beingInspected = inspect;
+		UI.sendEvent(beingInspected ? Constants.INSPECT_PLUGIN : Constants.UN_INSPECT_PLUGIN, name);
 	}
 }
 
@@ -729,8 +742,7 @@ class CacophoniaCanvas extends Canvas {
     					inspect.addActionListener(new ActionListener() {
 							@Override
 							public void actionPerformed(ActionEvent e) {
-								plugin.beingInspected = !plugin.beingInspected;
-								UI.sendEvent(plugin.beingInspected ? Constants.INSPECT_PLUGIN : Constants.UN_INSPECT_PLUGIN, plugin.name);
+								plugin.toggleInspect();
 								CacophoniaCanvas.this.remove(menu);
 							}
 						});
