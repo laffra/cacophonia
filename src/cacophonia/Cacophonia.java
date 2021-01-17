@@ -187,8 +187,8 @@ class RemoteUI {
 							break;
 						}
 					} catch (Exception e) {
-						e.printStackTrace();
-						System.exit(1);
+						System.out.println("UI went away");
+						System.exit(0);
 					}
 				}
 			}
@@ -202,7 +202,8 @@ class RemoteUI {
 				outputStream.flush(); 
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			System.out.println("UI went away");
+			System.exit(0);
 		}  
 	}
 	

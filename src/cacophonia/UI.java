@@ -5,7 +5,6 @@ import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Canvas;
-import java.awt.Checkbox;
 import java.awt.Choice;
 import java.awt.Color;
 import java.awt.Component;
@@ -41,6 +40,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.prefs.Preferences;
 
 import javax.sound.midi.Instrument;
 import javax.sound.midi.MidiChannel;
@@ -86,8 +86,7 @@ public class UI {
 	static Image drawing = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB);
 	static HashMap<String, Boolean> called = new HashMap<>();
 	static HashMap<String, Integer> scores = new HashMap<>();
-	static List<HashMap<String, Integer>> history = new ArrayList<HashMap<String, Integer>>();
-	static int instrumentStartNumber;
+	static List<HashMap<String, Integer>> history;
 	static JComboBox<Object> instrumentSelector;
 	static JLabel time;
 	static DataOutputStream eventStream;
@@ -95,10 +94,11 @@ public class UI {
 	static boolean live = true;
 	static int historyIndex;
 	static boolean muted = true;
-	static boolean manual = false;
 	static Date historyFrozen = new Date();
 	static boolean overrideBeep = false;
 	static FluxController fluxController;
+	static SoundTheme currentSoundTheme;
+	static Preferences preferences = Preferences.userNodeForPackage(UI.class);
 	
 
 	public static void main(String args[]) {
@@ -108,6 +108,10 @@ public class UI {
 			initHistory();
 		    updateDisplay();
 			setupRedrawLoop();
+			
+			called.put("org.eclipse.core org.eclipse.swt", true);
+			called.put("org.eclipse.swt org.eclipse.runtime", true);
+			called.put("org.eclipse.ide org.eclipse.swt", true);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -200,6 +204,7 @@ public class UI {
 	}
 	
 	private static void initHistory() {
+		history = new ArrayList<HashMap<String, Integer>>();
 		for (int n=0; n<HISTORY_SIZE; n++) {
 			history.add(new HashMap<String,Integer>());
 		}
@@ -243,8 +248,7 @@ public class UI {
 		
 		Container header = createHeader();
 		header.add(createThemeUI());
-		header.add(new Label("|"));
-		header.add(createManualUI());
+		header.add(createInstrumentSelector());
 		header.add(new Label("|"));
 		header.add(createFilterUI());
 		header.add(new Label("|"));
@@ -267,6 +271,7 @@ public class UI {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				Plugin.clear();
+				UI.initHistory();
 			}
 		});
 		container.add(clear);
@@ -304,33 +309,34 @@ public class UI {
 		});
 		container.add(checkbox);
 		Choice themeChooser = new Choice();
-		for (SoundTheme theme: SoundTheme.getAllThemes()) {
+		for (SoundTheme theme: SoundTheme.themes) {
 			themeChooser.add(theme.name);  
 		}
 		themeChooser.addItemListener(new ItemListener() {
 			public void itemStateChanged(ItemEvent e) {
-				SoundTheme theme = SoundTheme.getAllThemes()[themeChooser.getSelectedIndex()];
-				UI.instrumentStartNumber = theme.startNumber;
-				Plugin.updateInstruments();
+				selectSoundTheme(themeChooser.getSelectedIndex());
+				UI.preferences.put("lastTheme", ""+themeChooser.getSelectedIndex());
 			}
 		});
+		int lastTheme = Integer.parseInt(UI.preferences.get("lastTheme", "0"));
+		themeChooser.select(lastTheme);
+		selectSoundTheme(lastTheme);
 		container.add(themeChooser);
 		return container;
 	}
-
-	private static Component createManualUI() {
-		Checkbox manual = new Checkbox("manual", false);
-		manual.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				UI.manual = !manual.getState();
-				Plugin.clearInstruments();
-			}
-		});
+	
+	static void selectSoundTheme(int index) {
+		UI.currentSoundTheme = SoundTheme.themes[index];
+		Plugin.updateInstruments();
+		System.out.println("Theme changed to " + UI.currentSoundTheme.name);
+	}
+	
+	private static Component createInstrumentSelector() {
 		List<String> instrumentNames = new ArrayList<String>();
 		instrumentNames.add("None");
-		for (int n=0; n<SoundTheme.instruments.length; n++) {
-       		instrumentNames.add(String.format("%d - %s", n, SoundTheme.instruments[n].getName()));
+		Instrument instruments[] = UI.orchestra.synthesizer.getAvailableInstruments();
+		for (int n=0; n<instruments.length; n++) {
+       		instrumentNames.add(String.format("%d - %s", n, instruments[n].getName()));
 		}
 		instrumentSelector = new JComboBox<Object>(instrumentNames.toArray());
 		instrumentSelector.setMaximumRowCount(64);
@@ -338,7 +344,7 @@ public class UI {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				if (Plugin.selectedPlugin != null) {
-					Plugin.selectedPlugin.instrument = instrumentSelector.getSelectedIndex() - 1;
+					Plugin.selectedPlugin.setInstrument(instrumentSelector.getSelectedIndex() - 1);
 				}
 			}
 		});
@@ -348,7 +354,7 @@ public class UI {
 			public void actionPerformed(ActionEvent e) {
 				if (Plugin.selectedPlugin != null) {
 					Plugin plugin = Plugin.selectedPlugin;
-					plugin.instrument = Math.max(plugin.instrument - 1, -1);
+					plugin.setInstrument(Math.max(plugin.instrument - 1, -1));
 					instrumentSelector.setSelectedIndex(plugin.instrument + 1);
 				}
 			}
@@ -359,14 +365,13 @@ public class UI {
 			public void actionPerformed(ActionEvent e) {
 				if (Plugin.selectedPlugin != null) {
 					Plugin plugin = Plugin.selectedPlugin;
-					plugin.instrument = Math.max(plugin.instrument + 1, -1);
+					plugin.setInstrument(Math.max(plugin.instrument + 1, -1));
 					instrumentSelector.setSelectedIndex(plugin.instrument + 1);
 				}
 			}
 		});
 		Container container = new Container();
 		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
-		container.add(manual);
 		container.add(previous);
 		container.add(instrumentSelector);
 		container.add(next);
@@ -446,30 +451,59 @@ public class UI {
 
 
 class SoundTheme {
-	int startNumber;
 	String name;
-	static Instrument instruments[];
+	HashMap<String,Integer> pluginToInstrument = new HashMap<>();
+	static SoundTheme[] themes;
+
 	
-	public SoundTheme(String name, int startNumber) {
+	public SoundTheme(String name) {
 		this.name = name;
-		this.startNumber = startNumber;
+		loadTheme();
 	}
 	
-	static SoundTheme[] getAllThemes() {
-		return new SoundTheme[] {
-				new SoundTheme("Suspense", 120),
-				new SoundTheme("Ping", 146),
-				new SoundTheme("Computer", 94),
-				new SoundTheme("Transmission", 114),
-				new SoundTheme("Spring", 7),
-				new SoundTheme("Summer", 135),
-				new SoundTheme("Fall", 137),
-				new SoundTheme("Gamelang", 141),
-		};
+	void loadTheme() {
+		String assignments[] = UI.preferences.get(name, "").split("#");
+		for (String assignment : assignments) {
+			if (assignment.length() == 0) continue;
+			String[] keyValue = assignment.split("=");
+			pluginToInstrument.put(keyValue[0], Integer.parseInt(keyValue[1]));
+		}
+		Plugin.updateInstruments();
+	}
+	
+	void saveTheme() {
+		List<String> assignments = new ArrayList<String>();
+		for (Map.Entry<String,Integer> entry : pluginToInstrument.entrySet()) {
+			assignments.add(String.format("%s=%s", entry.getKey(), entry.getValue()));
+		}
+		UI.preferences.put(name, String.join("#", assignments));
+	}
+	
+	int getInstrument(String pluginName) {
+		if (name.equals("Cacophonia")) {
+			return Math.abs(pluginName.hashCode()) % 128;
+		}
+		return pluginToInstrument.getOrDefault(pluginName, -1);
+	}
+	
+	int getNote(String pluginName) {
+		// Return a note related to the plugin's name, random, but the same each run
+		return 80 + pluginName.hashCode() % 48;
 	}
 	
 	static {
-		instruments = UI.orchestra.synthesizer.getAvailableInstruments();
+		UI.currentSoundTheme = new SoundTheme("Cacophonia");
+		themes = new SoundTheme[] {
+				UI.currentSoundTheme,
+				new SoundTheme("Custom Theme 1"),
+				new SoundTheme("Custom Theme 2"),
+				new SoundTheme("Custom Theme 3"),
+		};
+	}
+
+	public void setInstrument(String instrumentName, int instrument) {
+		pluginToInstrument.put(instrumentName, instrument);
+		saveTheme();
 	}
 }
 
@@ -510,8 +544,13 @@ class Plugin {
 		int row = count / UI.PLUGINS_PER_ROW;
 		x = UI.MARGIN * 2 + UI.PLUGIN_SIZE * column;
 		y = UI.MARGIN * 2 + UI.PLUGIN_SIZE * row;
-		instrument = UI.orchestra.getNextInstrument(name);
+		instrument = UI.currentSoundTheme.getInstrument(name);
 		chooseNote();
+	}
+
+	public void setInstrument(int instrument) {
+		this.instrument = instrument;
+		UI.currentSoundTheme.setInstrument(name, instrument);
 	}
 
 	public static void clearInstruments() {
@@ -525,18 +564,17 @@ class Plugin {
 			plugin.setInspect(false);
 		}
 		plugins.clear();
+		selectedPlugin = null;
 	}
 
 	public static void updateInstruments() {
 		for (Plugin plugin: plugins.values()) {
-			plugin.instrument = UI.orchestra.getNextInstrument(plugin.name);
+			plugin.instrument = UI.currentSoundTheme.getInstrument(plugin.name);
 		}
 	}
 
 	private void chooseNote() {
-		note = (int)(Math.random() * 128);		// A totally random note
-		note = (50 + plugins.size()) % 128;  	// Make the tone depend on how recent the plugin was loaded
-		note = 50 + name.hashCode() % 78;		// A note related to the plugin's name, random, but the same each run
+		note = UI.currentSoundTheme.getNote(name);
 	}
 	
 	static void drawAll(Graphics2D g) {
@@ -560,7 +598,7 @@ class Plugin {
 	}
 	
 	private boolean inside(int ex, int ey) {
-		return ex > x + UI.MARGIN && ey > y + UI.MARGIN && ex < x + UI.PLUGIN_SIZE - UI.MARGIN && ey < y + UI.PLUGIN_SIZE - UI.MARGIN;
+		return ex > x && ey > y && ex < x + UI.PLUGIN_SIZE && ey < y + UI.PLUGIN_SIZE;
 	}
 
 	static Plugin get(String name) {
@@ -656,8 +694,8 @@ class FluxController extends JPanel {
 	public FluxController() {
 		setBackground (Color.BLACK);  
 	    setPreferredSize(new Dimension(TIME_TRAVELER_WIDTH, TIME_TRAVELER_HEIGHT));
-	    addMouseMotionListener(new MouseAdapter() {
-	    	public void mouseMoved(MouseEvent e) {
+	    addMouseListener(new MouseAdapter() {
+	    	public void mouseClicked(MouseEvent e) {
 	    		value = e.getX() * UI.HISTORY_SIZE / TIME_TRAVELER_WIDTH;
 	    		repaint();
     			listener.stateChanged(null);
@@ -691,7 +729,7 @@ class FluxController extends JPanel {
         		int x = TIME_TRAVELER_WIDTH * index / UI.HISTORY_SIZE;
         		int h = 5 * (int)Math.log(scores.size());
             	g.drawLine(x, TIME_TRAVELER_HEIGHT - h, x, TIME_TRAVELER_HEIGHT);
-            	if (UI.manual && hasSound(scores)) {
+            	if (hasSound(scores)) {
             		g.setColor(Color.YELLOW);
             		g.drawRect(x - 1, TIME_TRAVELER_HEIGHT - h - 1, 3, 3);
             		g.setColor(Color.RED);        		
@@ -813,11 +851,6 @@ class Orchestra {
 	
 	public void allNotesOff() {
 		midiChannel.allNotesOff();
-	}
-	
-	public int getNextInstrument(String pluginName) {
-		if (UI.manual) return -1;
-		return Math.abs(UI.instrumentStartNumber + pluginName.hashCode()) % 128;
 	}
 	
 	public void setInstrument(int instrumentNumber) {
