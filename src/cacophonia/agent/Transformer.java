@@ -1,69 +1,14 @@
-package cacophonia;
+package cacophonia.agent;
 
-import java.io.File;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
-import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
 import java.util.HashSet;
 
 import javassist.ByteArrayClassPath;
 import javassist.CannotCompileException;
-import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtMethod;
-import javassist.NotFoundException;
-
-
-/**
-  * {@link Agent} uses {@link Transformer} to implement the Java instrumentation API to 
-  * trace all methods in Eclipse. 
-  * <p>
-  * Method calls between plugins are captured and sent to a remote UI to render, 
-  * using {@link RemoteUI}.
-  * <p>
-  * See the following files for configuration:
-  * <ul>
-  * <li> <tt>build_agent.sh</tt>: A custom builder for this project. See <tt>Project Properties >Builders</tt>.
-  * <li> <tt>manifest.txt</tt>: Used by <tt>build_agent.sh</tt> to create the agent jar.
-  * <li> <tt>javassist.3.27.0.jar</tt>: The bytecode instrumentation packages used by the agent.
-  * </ul>
-  */
-public class Agent {
-	static String jarPath = System.getProperty("user.home") + "/cacophonia.1.0.0.jar";
-	
-    public static void premain(String agentArgs, Instrumentation instrumentation) {
-        try {
-        	setup();
-        	loadRemoteUI();
-        	registerTransformer(instrumentation);
-        } catch (Exception e) {
-        	e.printStackTrace();
-        }
-    }
-    
-    private static void registerTransformer(Instrumentation instrumentation) {
-		System.out.println("Registering Cacophonia Transformer...");
-        instrumentation.addTransformer(new Transformer());
-	}
-
-	private static void loadRemoteUI() throws Exception {
-    	System.out.println("Cacophonia is now running...");
-    	System.out.println("Loading Cacophonia UI...");
-        ProcessBuilder process = new ProcessBuilder("java", "-classpath", jarPath, "cacophonia.UI");
-        process.inheritIO();
-        process.start();
-        Thread.sleep(1000);
-	}
-
-	static void setup() {
-    	if (!new File(jarPath).exists()) {
-    		System.out.println("Cannot load Cacophonia. Please run 'build_agent.sh'. Missing: " + jarPath);
-    		System.exit(1);
-    	}
-    }
-}
-
 
 /**
  * Transformer instruments each method with calls to the Cacopohonia runtime to inform it on enter/leave events.
@@ -120,8 +65,8 @@ class Transformer implements ClassFileTransformer {
 
 	private void instrumentMethod(String className, CtMethod method) throws CannotCompileException {
 		try {
-			method.insertBefore("cacophonia.Cacophonia.enter(\"" + method.getLongName() + "\", $0);");    	
-			method.insertAfter("cacophonia.Cacophonia.leave(\"" + method.getLongName() + "\", $0);");    	
+			method.insertBefore("cacophonia.runtime.Cacophonia.enter(\"" + method.getLongName() + "\", $0);");    	
+			method.insertAfter("cacophonia.runtime.Cacophonia.leave(\"" + method.getLongName() + "\", $0);");    	
 		} catch (Exception e) {
             if (debug) System.out.println("Cannot instrument "+method.getName()+" "+method.getSignature());
         }
@@ -142,31 +87,5 @@ class Transformer implements ClassFileTransformer {
 				className.startsWith("sun.") || 
 				className.startsWith("com.sun.") || 
 				className.startsWith("javax."));
-	}
-}
-
-/**
- * 
- * A subclass of Javassist's ClassPool to handle package fragments.
- */
-class CacophoniaClassPool extends ClassPool {
-	ClassPool defaultClassPool = ClassPool.getDefault();
-
-	@Override
-	public CtClass get(String className) throws NotFoundException {
-		if (isPackageFragment(className)) {
-			throw new NotFoundException(className);
-		}
-		try {
-			return defaultClassPool.get(className);
-		} catch (NotFoundException e) {
-			return super.get(className);
-		}
-	}
-
-	private boolean isPackageFragment(String className) {
-		if (className.startsWith("[") || className.endsWith("]")) return false;
-		int lastDot = className.lastIndexOf(".");
-		return lastDot == -1 || Character.isLowerCase(className.charAt(lastDot + 1));
 	}
 }
