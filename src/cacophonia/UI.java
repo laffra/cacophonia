@@ -71,9 +71,9 @@ public class UI {
 
 	static final int WIDTH = 1200;
 	static final int HEIGHT = 1200;
-	static final int PLUGINS_PER_ROW = 13;
-	static final int MARGIN = 5;
-	static final int PLUGIN_SIZE = 90;
+	static final int PLUGINS_PER_ROW = 14;
+	static final int MARGIN = 3;
+	static final int PLUGIN_SIZE = WIDTH / PLUGINS_PER_ROW;
 	static final int REDRAW_DELAY = 150; 
 	static final int HISTORY_SECONDS = 60; 
 	static final int HISTORY_SAMPLES_PER_SECOND = 1000 / REDRAW_DELAY; 
@@ -429,8 +429,10 @@ public class UI {
 		});
 		live.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
-				fluxController.setValue(HISTORY_SIZE);
 				UI.live = live.isSelected();
+				if (UI.live) {
+					fluxController.setValue(HISTORY_SIZE);
+				}
 			}
 		});
 		fluxController.addChangeListener(new ChangeListener() {
@@ -439,7 +441,7 @@ public class UI {
  			}
 		});
 		Container container = new Container();
-		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
+		container.setLayout(new FlowLayout(FlowLayout.LEFT, 5, 1));
 		container.add(time);
 		container.add(previous);
 		container.add(fluxController);
@@ -685,7 +687,7 @@ class Plugin {
 class FluxController extends JPanel {
 	private static final int TIME_TRAVELER_WIDTH = 120;
 	private static final int TIME_TRAVELER_HEIGHT = 30;
-	private int value;
+	private int value, highlight;
 	private ChangeListener listener;
 	private Image drawing = new BufferedImage(TIME_TRAVELER_WIDTH, TIME_TRAVELER_HEIGHT, BufferedImage.TYPE_INT_ARGB);
 	private long lastDraw;
@@ -701,6 +703,11 @@ class FluxController extends JPanel {
     			listener.stateChanged(null);
 	    	}
 	    });
+	    addMouseMotionListener(new MouseAdapter() {
+	    	public void mouseMoved(MouseEvent e) {
+	    		highlight = e.getX() * UI.HISTORY_SIZE / TIME_TRAVELER_WIDTH;
+	    	}
+	    });
 	}
     public void addChangeListener(ChangeListener listener) {
 		this.listener = listener;
@@ -713,12 +720,18 @@ class FluxController extends JPanel {
 	}
 	public void repaint() { 
 		long now = System.currentTimeMillis();
-		if (now - lastDraw < 1000) return;
+		if (now - lastDraw < 500) return;
 		lastDraw = now;
 		super.repaint();
 	}
 	public void paintComponent(Graphics graphics) { 
 		Graphics2D g = (Graphics2D) drawing.getGraphics();
+		drawHistory(g);
+        drawMarker(g);
+        drawHighlight(g);
+    	graphics.drawImage(drawing, 0, 0, this);
+	}
+	private void drawHistory(Graphics2D g) {
 	    int index = 0;
 		g.setColor(Color.BLACK);
 		g.fillRect(0, 0, TIME_TRAVELER_WIDTH, TIME_TRAVELER_HEIGHT);
@@ -737,11 +750,19 @@ class FluxController extends JPanel {
         	}
         	index += 1;
         }
-    	g.setColor(Color.ORANGE);
-    	g.setStroke(new BasicStroke(1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-    	int x = TIME_TRAVELER_WIDTH * value / UI.HISTORY_SIZE;
+	}
+	private void drawMarker(Graphics2D g) {
+    	drawBar(g, Color.ORANGE, value);
+	} 
+	private void drawHighlight(Graphics2D g) {
+		drawBar(g, Color.WHITE, highlight);
+    	highlight = 0;
+	} 
+	private void drawBar(Graphics2D g, Color color, int location) {
+    	g.setColor(color);
+    	g.setStroke(new BasicStroke(3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+    	int x = TIME_TRAVELER_WIDTH * location / UI.HISTORY_SIZE - 1;
     	g.drawLine(x, 0, x, TIME_TRAVELER_HEIGHT);
-    	graphics.drawImage(drawing, 0, 0, this);
 	} 
 	private boolean hasSound(Map<String,Integer> scores) {
 		for (Map.Entry<String,Integer> entry : scores.entrySet()) {
