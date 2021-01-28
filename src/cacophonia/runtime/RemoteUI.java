@@ -64,9 +64,10 @@ class RemoteUI {
 		}).start();
 	}
 	
-	public void sendEvent(String message) {
+	public void sendEvent(int type, String message) {
 		try {
 			synchronized (socket) {
+				outputStream.writeInt(type);
 				outputStream.writeUTF(message);
 				outputStream.flush(); 
 			}

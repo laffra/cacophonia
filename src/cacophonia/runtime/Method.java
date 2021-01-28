@@ -6,6 +6,8 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Stack;
 
+import cacophonia.Constants;
+
 /**
  * Represents a method inside a class defined by one of Eclipse's plugins. 
  * 
@@ -14,16 +16,18 @@ import java.util.Stack;
  */
 class Method {
 	private static Hashtable<String,Method> methods = new Hashtable<String,Method>();
-	
 	private static ThreadLocal<Stack<String>> pluginStack = ThreadLocal.withInitial(() -> new Stack<String>());
 	private static String lastPlugin = "eclipse.main";
 	private static RemoteUI remoteUI = new RemoteUI();
 	private static int callDepth = 0;
-	
-	static HashSet<String> tracedPlugins = new HashSet<String>();
+	private static HashSet<String> pluginNames = new HashSet<String>();
+	private static HashSet<String> tracedPlugins = new HashSet<String>();
+
 	String name;
 	String fileName = "???";
-	int callCount;
+	int methodCallCount;
+	static int totalPluginCallCount;
+	static int totalMethodCallCount;
 	Field fields[];
 
 	private String plugin = "???";
@@ -41,6 +45,7 @@ class Method {
 		try {
 			ClassLoader classLoader = object.getClass().getClassLoader();
 			plugin = classLoader.toString().split("\\[")[1].split(":")[0];
+			pluginNames.add(plugin);
 			String[] nameParts = object.getClass().getName().split("\\.");
 			fileName = nameParts[nameParts.length - 1].split("\\$")[0] + ".java";
 			fields = object.getClass().getDeclaredFields();
@@ -50,12 +55,12 @@ class Method {
 	}
 	
 	public void enter(Object object) {
-		callCount++;
+		methodCallCount++;
 		synchronized (tracedPlugins) {
 			if (tracedPlugins.contains(plugin)) {
 				if (callDepth == 0) System.out.println(new Date());
 				for (int n=0; n<callDepth; n++) System.out.print("    ");
-				System.out.println(String.format("at %s(%s:1) - %d calls {", name, fileName, callCount));
+				System.out.println(String.format("at %s(%s:1) - %d calls {", name, fileName, methodCallCount));
 				callDepth++;
 				for (Field field : fields) {
 				    field.setAccessible(true);
@@ -74,9 +79,16 @@ class Method {
 			if (!lastPlugin.equals(plugin)) {
 				Stack<String> stack = pluginStack.get();
 				stack.push(plugin);
-				remoteUI.sendEvent(String.format("%s %s", lastPlugin, plugin));
+				remoteUI.sendEvent(Constants.PLUGIN_TO_PLUGIN_CALL, String.format("%s %s", lastPlugin, plugin));
+				totalPluginCallCount++;
 			}
 			lastPlugin = plugin;
+			if (++totalMethodCallCount % 10000 == 0) {
+				String stats = String.format("#method=%,d  #messages=%,d  #plugins=%,d",
+						totalMethodCallCount, totalPluginCallCount, pluginNames.size()
+				);
+				remoteUI.sendEvent(Constants.STATISTICS, stats);
+			}
 		}
 	}
 	

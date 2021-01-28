@@ -72,6 +72,8 @@ public class UI {
 	static FluxController fluxController;
 	static SoundTheme currentSoundTheme;
 	static Preferences preferences = Preferences.userNodeForPackage(UI.class);
+	static enum DrawType { EDGES, PLUGIN, CALLS };
+	static String statistics = "";
 	
 
 	public static void main(String args[]) {
@@ -95,7 +97,7 @@ public class UI {
 						synchronized (called) {
 							if (live) updateScores();
 							updateDisplay();
-							if (live) updateHistory();
+							//if (live) updateHistory();
 							overrideBeep = false;
 						}
 					} catch (Exception e) {
@@ -116,11 +118,21 @@ public class UI {
 					eventStream = new DataOutputStream(socket.getOutputStream());
 					while (true) {
 						try {
-							String pluginToPlugin = (String)dis.readUTF();
-							synchronized (called) {
-								if (pluginToPlugin.indexOf(" ") != -1) {
-									called.put(pluginToPlugin, true);
+							int command = dis.readInt();
+							switch (command) {
+							case Constants.STATISTICS:
+								statistics = (String)dis.readUTF();
+								break;
+							case Constants.PLUGIN_TO_PLUGIN_CALL:
+								String pluginToPlugin = (String)dis.readUTF();
+								synchronized (called) {
+									if (pluginToPlugin.indexOf(" ") != -1) {
+										called.put(pluginToPlugin, true);
+										String[] pluginNames = pluginToPlugin.split(" ");
+										Plugin.called(pluginNames[0], pluginNames[1]);
+									}
 								}
+								break;
 							}
 						} catch (Exception e) {
 							serverSocket.close();
@@ -164,12 +176,9 @@ public class UI {
 		drawing = new BufferedImage(Constants.WIDTH, Constants.HEIGHT, BufferedImage.TYPE_INT_ARGB);
 	    Graphics2D g = (Graphics2D) drawing.getGraphics();
 	    Plugin.drawAll((Graphics2D) g);
-	    g.setColor(Color.WHITE);
-	    updateDrawing(g, false);
-	    updateDrawing(g, true);
 	    g.dispose();
     	canvas.repaint();
-    	fluxController.repaint();
+    	// fluxController.repaint();
 	}
 	
 	private static void initHistory() {
@@ -182,33 +191,13 @@ public class UI {
 	@SuppressWarnings("unchecked")
 	private static void updateHistory() {
 	    scores.entrySet().removeIf(entry -> entry.getValue() == 0);
-	    history.remove(0);
-	    history.add((HashMap<String,Integer>)scores.clone());
+		synchronized(history) { 
+			history.remove(0);
+			history.add((HashMap<String,Integer>)scores.clone());
+		}
 	    updateTime();
 	}
 	
-	
-	static void updateDrawing(Graphics2D g, boolean drawLine) {
-	    for (Map.Entry<String,Integer> entry : scores.entrySet()) {
-	    	String key = entry.getKey();
-	    	int value = entry.getValue();
-	    	if (value == 0) continue;
-	    	String pluginNames[] = key.split(" ");
-	    	Plugin from = Plugin.get(pluginNames[0]);
-	    	Plugin to = Plugin.get(pluginNames[1]);
-	    	if (drawLine) {
-		    	from.drawLineTo(to, value, g);
-		    	if (live) {
-			    	value = Math.max(value - 1, 0);
-			    	scores.put(key, value);
-		    	}
-	    	} else {
-	    		from.highlight(g);
-	    		to.highlight(g);
-	    	}
-	    }
-	}
-
 	private static void createUI() {
 		JFrame frame = new JFrame("Eclipse Cacophonia");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -220,8 +209,8 @@ public class UI {
 		header.add(createInstrumentSelector());
 		header.add(new Label("|"));
 		header.add(createFilterUI());
-		header.add(new Label("|"));
-		header.add(createHistoryUI());
+		//header.add(new Label("|"));
+		//header.add(createHistoryUI());
 		mainContainer.add(header, BorderLayout.NORTH);
 
 		canvas = new CacophoniaCanvas();
@@ -244,15 +233,25 @@ public class UI {
 			}
 		});
 		container.add(clear);
-		container.add(new Label("filter:"));
-		TextField filter = new TextField(10);
+		container.add(new Label("focus:"));
+		TextField filter = new TextField(50);
 		filter.addTextListener(new TextListener() {	
 			@Override
 			public void textValueChanged(TextEvent e) {
 				UI.pluginFilter = filter.getText();
+				Plugin.focusUpdated();
 			}
 		});
 		container.add(filter);
+		JCheckBox graph = new JCheckBox("graph", true);
+		graph.addChangeListener(new ChangeListener() {
+			public void stateChanged(ChangeEvent e) {
+				Plugin.useGraphLayout = graph.isSelected();
+				Plugin.clear();
+				UI.initHistory();
+			}
+		});
+		container.add(graph);
 		return container;
 	}
 

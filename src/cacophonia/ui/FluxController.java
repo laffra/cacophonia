@@ -73,19 +73,21 @@ class FluxController extends JPanel {
 		g.fillRect(0, 0, TIME_TRAVELER_WIDTH, TIME_TRAVELER_HEIGHT);
     	g.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 		g.setColor(Color.RED);
-        for (HashMap<String, Integer> scores: UI.history) {
-        	if (scores.size() > 0) {
-        		int x = TIME_TRAVELER_WIDTH * index / Constants.HISTORY_SIZE;
-        		int h = 5 * (int)Math.log(scores.size());
-            	g.drawLine(x, TIME_TRAVELER_HEIGHT - h, x, TIME_TRAVELER_HEIGHT);
-            	if (hasSound(scores)) {
-            		g.setColor(Color.YELLOW);
-            		g.drawRect(x - 1, TIME_TRAVELER_HEIGHT - h - 1, 3, 3);
-            		g.setColor(Color.RED);        		
-            	}
-        	}
-        	index += 1;
-        }
+		synchronized(UI.history) { 
+			for (HashMap<String, Integer> scores: UI.history) {
+				if (scores.size() > 0) {
+					int x = TIME_TRAVELER_WIDTH * index / Constants.HISTORY_SIZE;
+					int h = Math.max(TIME_TRAVELER_HEIGHT - 30, 4 * (int)Math.log(scores.size()));
+					g.drawLine(x, TIME_TRAVELER_HEIGHT - h, x, TIME_TRAVELER_HEIGHT);
+					if (hasSound(scores)) {
+						g.setColor(Color.YELLOW);
+						g.drawRect(x - 1, TIME_TRAVELER_HEIGHT - h - 1, 3, 3);
+						g.setColor(Color.RED);        		
+					}
+				}
+				index += 1;
+			}
+		}
 	}
 	private void drawMarker(Graphics2D g) {
     	drawBar(g, Color.ORANGE, value);

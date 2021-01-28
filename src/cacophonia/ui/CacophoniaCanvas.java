@@ -59,6 +59,24 @@ class CacophoniaCanvas extends Canvas {
 	    			}
 	    		}
 	    	}
+	    	@Override
+	    	public void mousePressed(MouseEvent e) {
+	    		Plugin.select(e.getX(), e.getY());
+	    		System.out.println("Pressed " + Plugin.selectedPlugin);
+				super.mousePressed(e);
+	    	}
+		});
+	    addMouseMotionListener(new MouseAdapter() {
+	    	@Override
+	    	public void mouseDragged(MouseEvent e) {
+	    		Plugin.move(e.getX(), e.getY());
+	    		super.mouseDragged(e);
+	    	}
+	    	@Override
+	    	public void mouseMoved(MouseEvent e) {
+	    		Plugin.hover(e.getX(), e.getY());
+	    		super.mouseDragged(e);
+	    	}
 		});
 	}  
     public void paint(Graphics g) { 
