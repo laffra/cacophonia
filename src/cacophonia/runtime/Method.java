@@ -175,7 +175,7 @@ class Method {
 				Stack<String> stack = pluginStack.get();
 				if (!stack.isEmpty()) lastPlugin = stack.pop();
 			}
-			if (jobNameField != null) {
+			if (jobNameField != null && name.endsWith(".run(org.eclipse.core.runtime.IProgressMonitor)")) {
 				try {
 					String name = (String) jobNameField.get(object);
 					String message = String.format("%05d %s, %.1fs \"%s\"    (%s)",
@@ -184,6 +184,7 @@ class Method {
 							(System.currentTimeMillis() - jobStartTime) / 1000,
 							name,
 							object.getClass().getName());
+					System.out.println("#### Run Job " + message);
 					remoteUI.sendEvent(Constants.EVENT_JOB, message);
 				} catch (IllegalArgumentException | IllegalAccessException e) {
 					e.printStackTrace();

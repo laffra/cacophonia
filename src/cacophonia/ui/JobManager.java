@@ -6,6 +6,7 @@ import java.awt.Composite;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.List;
 
 import cacophonia.Constants;
@@ -41,6 +42,14 @@ public class JobManager {
 			@Override
 			public void paintAfter(Graphics2D g) {
 				if (!enabled) return;
+				try {
+					paintJobs(g);
+				} catch (ConcurrentModificationException e) {
+					// a new job arrived while painting, ignore for performance
+				}
+			}
+			
+			private void paintJobs(Graphics2D g) {
 				g.setFont(font);
 				g.setColor(Color.GRAY);
 				g.setComposite(Plugin.opaque);

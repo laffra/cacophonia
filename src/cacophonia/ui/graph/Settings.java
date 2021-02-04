@@ -33,8 +33,8 @@ public class Settings {
 	// settings for calls in the past edges to attract two nodes
 	double historyEdgeWeight = 5.0;
 	double historyEdgeDecay = 0.05;
-	double historyEdgeAttractionForce = 0.1;
-	double historyEdgeLength = 750;
+	double historyEdgeAttractionForce = 0.5;
+	double historyEdgeLength = 350;
 	Color historyEdgeColor = Color.PINK;
 	int historyEdgeLevel = 1;
 
