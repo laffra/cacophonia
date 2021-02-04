@@ -7,7 +7,9 @@ Bundle-Vendor: ChrisLaffra
 Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.ui,
  org.eclipse.pde.ui;bundle-version="3.12.100",
- org.eclipse.core.resources;bundle-version="3.13.900"
+ org.eclipse.core.resources;bundle-version="3.13.900",
+ org.junit,
+ org.junit.jupiter.api
 Bundle-RequiredExecutionEnvironment: JavaSE-15
 Import-Package: javax.inject
 Automatic-Module-Name: cacophonia

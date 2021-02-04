@@ -3,14 +3,13 @@ package cacophonia.ui;
 import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Choice;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Graphics2D;
-import java.awt.Image;
 import java.awt.Label;
+import java.awt.MenuItem;
+import java.awt.PopupMenu;
 import java.awt.TextField;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -18,19 +17,16 @@ import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.awt.event.TextEvent;
 import java.awt.event.TextListener;
-import java.awt.image.BufferedImage;
+import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.prefs.Preferences;
 
 import javax.sound.midi.Instrument;
@@ -42,6 +38,10 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
 import cacophonia.Constants;
+import cacophonia.DetailLevel;
+import cacophonia.ui.graph.Graph;
+import cacophonia.ui.graph.PopupMenuListener;
+import cacophonia.ui.graph.Settings;
 
 
 /**
@@ -54,12 +54,9 @@ import cacophonia.Constants;
  * </ul>
  */
 public class UI {
-	static CacophoniaCanvas canvas;
 	static Orchestra orchestra = new Orchestra();
-	static Image drawing = new BufferedImage(Constants.WIDTH, Constants.HEIGHT, BufferedImage.TYPE_INT_ARGB);
 	static HashMap<String, Boolean> called = new HashMap<>();
 	static HashMap<String, Integer> scores = new HashMap<>();
-	static List<HashMap<String, Integer>> history;
 	static JComboBox<Object> instrumentSelector;
 	static JLabel time;
 	static DataOutputStream eventStream;
@@ -68,68 +65,74 @@ public class UI {
 	static int historyIndex;
 	static boolean muted = true;
 	static Date historyFrozen = new Date();
-	static boolean overrideBeep = false;
-	static FluxController fluxController;
 	static SoundTheme currentSoundTheme;
 	static Preferences preferences = Preferences.userNodeForPackage(UI.class);
 	static enum DrawType { EDGES, PLUGIN, CALLS };
 	static String statistics = "";
+	static Graph graph;
+	static Settings graphSettings = new Settings();
+	static JobManager jobManager;
 	
 
 	public static void main(String args[]) {
 		try {
 			setupListener();
 	    	createUI();
-			initHistory();
-		    updateDisplay();
-			setupRedrawLoop();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
-	
-	private static void setupRedrawLoop() {
-		new Thread(new Runnable() {
-			public void run() {
-				while (true) {
-					try {
-						Thread.sleep(Constants.REDRAW_DELAY);
-						synchronized (called) {
-							if (live) updateScores();
-							updateDisplay();
-							//if (live) updateHistory();
-							overrideBeep = false;
-						}
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
-				}
-			}
-		}).start();
-	}
 
-	private static void setupListener() {
+	static void setupListener() {
 		new Thread(new Runnable() {
 			public void run() {
 				try{  
 					ServerSocket serverSocket = new ServerSocket(6666);  
 					Socket socket = serverSocket.accept();   
-					DataInputStream dis=new DataInputStream(socket.getInputStream());  
+					DataInputStream dis=new DataInputStream(new BufferedInputStream(socket.getInputStream()));  
 					eventStream = new DataOutputStream(socket.getOutputStream());
 					while (true) {
 						try {
 							int command = dis.readInt();
 							switch (command) {
-							case Constants.STATISTICS:
+							case Constants.EVENT_STATISTICS:
 								statistics = (String)dis.readUTF();
 								break;
-							case Constants.PLUGIN_TO_PLUGIN_CALL:
+							case Constants.EVENT_PLUGIN_DETAILS:
+								// not handled
+								break;
+							case Constants.EVENT_JOB:
+								handleJob((String)dis.readUTF());
+								break;
+							case Constants.EVENT_PLUGIN_TO_PLUGIN_CALL:
 								String pluginToPlugin = (String)dis.readUTF();
 								synchronized (called) {
 									if (pluginToPlugin.indexOf(" ") != -1) {
-										called.put(pluginToPlugin, true);
 										String[] pluginNames = pluginToPlugin.split(" ");
-										Plugin.called(pluginNames[0], pluginNames[1]);
+										String from = pluginNames[0];
+										String to = pluginNames[1];
+										switch (Plugin.detailLevel) {
+										case FEATURE:
+											// map fragments to plugins
+											from = PluginRegistry.getPluginForFragment(from);
+											to = PluginRegistry.getPluginForFragment(to);
+											// map plugins to features
+											from = PluginRegistry.getFeatureForPlugin(from);
+											to = PluginRegistry.getFeatureForPlugin(to);
+											break;
+										case PLUGIN:
+											// map fragments to plugins
+											from = PluginRegistry.getPluginForFragment(from);
+											to = PluginRegistry.getPluginForFragment(to);
+											break;
+										case FRAGMENT:
+											// show all the detail possible
+											break;
+										default:
+											break;
+										}
+										Plugin.called(from, to, graph);
+										called.put(pluginToPlugin, true);
 									}
 								}
 								break;
@@ -151,6 +154,10 @@ public class UI {
 		}).start();
 	}
 
+	static void handleJob(String jobDetails) {
+		jobManager.addJob(jobDetails);
+	}
+
 	static void sendEvent(int command, String details) {
 		try {
 			eventStream.writeInt(command);
@@ -160,45 +167,7 @@ public class UI {
 		}
 	}
 	
-	private static void updateScores() {
-	    for (Map.Entry<String,Boolean> entry : called.entrySet()) {
-	    	String key = entry.getKey();
-	    	boolean value = entry.getValue();
-	    	if (value) {
-	    		// A call was made between the two plug-ins in the last 200ms
-		    	scores.put(key, Constants.HEART_BEAT);
-	    	}
-	    	called.put(key, false);
-	    }
-	}
-	
-	private static void updateDisplay() {
-		drawing = new BufferedImage(Constants.WIDTH, Constants.HEIGHT, BufferedImage.TYPE_INT_ARGB);
-	    Graphics2D g = (Graphics2D) drawing.getGraphics();
-	    Plugin.drawAll((Graphics2D) g);
-	    g.dispose();
-    	canvas.repaint();
-    	// fluxController.repaint();
-	}
-	
-	private static void initHistory() {
-		history = new ArrayList<HashMap<String, Integer>>();
-		for (int n=0; n<Constants.HISTORY_SIZE; n++) {
-			history.add(new HashMap<String,Integer>());
-		}
-	}
-	
-	@SuppressWarnings("unchecked")
-	private static void updateHistory() {
-	    scores.entrySet().removeIf(entry -> entry.getValue() == 0);
-		synchronized(history) { 
-			history.remove(0);
-			history.add((HashMap<String,Integer>)scores.clone());
-		}
-	    updateTime();
-	}
-	
-	private static void createUI() {
+	static void createUI() {
 		JFrame frame = new JFrame("Eclipse Cacophonia");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		Container mainContainer = frame.getContentPane();
@@ -209,19 +178,60 @@ public class UI {
 		header.add(createInstrumentSelector());
 		header.add(new Label("|"));
 		header.add(createFilterUI());
-		//header.add(new Label("|"));
-		//header.add(createHistoryUI());
 		mainContainer.add(header, BorderLayout.NORTH);
 
-		canvas = new CacophoniaCanvas();
-		mainContainer.add(canvas, BorderLayout.CENTER);
+    	// fluxController.repaint();
+
+		graph = new Graph(graphSettings);
+		graph.addPopupMenuListener(new PopupMenuListener() {
+			@Override
+			public PopupMenu createMenu(Component component) {
+				return createPopupMenu(component);
+			}
+		});
+		jobManager = new JobManager(graph);
+		mainContainer.add(graph, BorderLayout.CENTER);
 		
-		frame.setLocation(2300, 5);
 		frame.setSize(Constants.WIDTH, Constants.HEIGHT);
+	    frame.setLocationRelativeTo(null);
 		frame.setVisible(true);
 	}
+	
+	static PopupMenu createPopupMenu(Component component) {
+		Plugin plugin = (Plugin)component;
+		PopupMenu menu = new PopupMenu();
+		String name = plugin.fullName;
+		MenuItem inspect = new MenuItem(plugin.beingInspected ? "Stop inspecting " + name : "Inspect " + name);
+		menu.add(inspect);
+		inspect.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				plugin.toggleInspect();
+				graph.remove(menu);
+			}
+		});
+		MenuItem source = new MenuItem("Import this plugin as source");
+		menu.add(source);
+		source.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				UI.sendEvent(Constants.EVENT_IMPORT_PLUGIN_FROM_SOURCE, plugin.name);
+				graph.remove(menu);
+			}
+		});
+		MenuItem repository = new MenuItem("Import this plugin from repository");
+		menu.add(repository);
+		repository.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				UI.sendEvent(Constants.EVENT_IMPORT_PLUGIN_FROM_REPOSITORY, plugin.name);
+				graph.remove(menu);
+			}
+		});
+		return menu;
+	}
 
-	private static Component createFilterUI() {
+	static Component createFilterUI() {
 		Container container = new Container();
 		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
 		Button clear = new Button("clear");
@@ -229,33 +239,54 @@ public class UI {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				Plugin.clear();
-				UI.initHistory();
+				graph.clear();
 			}
 		});
 		container.add(clear);
+		Button shake = new Button("shake");
+		shake.addActionListener(new ActionListener() {			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				graph.shake();
+			}
+		});
+		container.add(shake);
 		container.add(new Label("focus:"));
-		TextField filter = new TextField(50);
+		TextField filter = new TextField(30);
 		filter.addTextListener(new TextListener() {	
 			@Override
 			public void textValueChanged(TextEvent e) {
 				UI.pluginFilter = filter.getText();
+				UI.preferences.put("filter", ""+filter.getText());
 				Plugin.focusUpdated();
 			}
 		});
+		filter.setText(UI.pluginFilter = UI.preferences.get("filter", ""));
 		container.add(filter);
-		JCheckBox graph = new JCheckBox("graph", true);
-		graph.addChangeListener(new ChangeListener() {
+		JCheckBox jobs = new JCheckBox("jobs", false);
+		jobs.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
-				Plugin.useGraphLayout = graph.isSelected();
-				Plugin.clear();
-				UI.initHistory();
+				jobManager.enable(jobs.isSelected());
 			}
 		});
-		container.add(graph);
+		container.add(jobs);
+		
+		JComboBox<String> levelSelector = new JComboBox<String>(new String[] { "Feature", "Plugin", "Fragment" });
+		levelSelector.setMaximumRowCount(64);
+		levelSelector.addActionListener(new ActionListener() {	
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				DetailLevel values[] = { DetailLevel.FEATURE, DetailLevel.PLUGIN, DetailLevel.FRAGMENT };
+				Plugin.detailLevel = values[levelSelector.getSelectedIndex()];
+				Plugin.clear();
+				graph.clear();
+			}
+		});
+		container.add(levelSelector);
 		return container;
 	}
 
-	private static Container createHeader() {
+	static Container createHeader() {
 		Container header = new Container();
 		header.setPreferredSize(new Dimension(800, 40));
 		header.setLayout(new FlowLayout(FlowLayout.CENTER, 15, 5));
@@ -263,7 +294,7 @@ public class UI {
 		return header;
 	}
 
-	private static Component createThemeUI() {
+	static Component createThemeUI() {
 		Container container = new Container();
 		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
 		JCheckBox checkbox = new JCheckBox("mute", true);
@@ -287,19 +318,19 @@ public class UI {
 			}
 		});
 		int lastTheme = Integer.parseInt(UI.preferences.get("lastTheme", "0"));
-		themeChooser.select(lastTheme);
 		selectSoundTheme(lastTheme);
+		themeChooser.select(lastTheme);
 		container.add(themeChooser);
 		return container;
 	}
 	
-	static void selectSoundTheme(int index) {
+	public static void selectSoundTheme(int index) {
 		UI.currentSoundTheme = SoundTheme.themes[index];
 		Plugin.updateInstruments();
 		System.out.println("Theme changed to " + UI.currentSoundTheme.name);
 	}
 	
-	private static Component createInstrumentSelector() {
+	static Component createInstrumentSelector() {
 		List<String> instrumentNames = new ArrayList<String>();
 		instrumentNames.add("None");
 		Instrument instruments[] = UI.orchestra.synthesizer.getAvailableInstruments();
@@ -345,76 +376,9 @@ public class UI {
 		container.add(next);
 		return container;
 	}
-	
-	private static void updateTime() {
-		Date date = new Date();
-		if (!live) {
-			int secondsBack = Constants.HISTORY_SECONDS - historyIndex * Constants.HISTORY_SECONDS / Constants.HISTORY_SIZE;
-			Calendar calendar=Calendar.getInstance();
-			calendar.setTime(historyFrozen);
-			calendar.set(Calendar.SECOND, calendar.get(Calendar.SECOND) - secondsBack);
-			date = calendar.getTime();
-		}
-		time.setText(new SimpleDateFormat("HH:mm:ss").format(date));
-	}
-	
-	private static void travelBackInTime(JCheckBox live, int index) {
-		fluxController.setValue(index);
-		historyIndex = fluxController.getValue();
-		if (UI.live) historyFrozen = new Date();
-		live.setSelected(false);
-		UI.live = false;
-		updateTime();
-		HashMap<String,Integer>historyScores = new HashMap<String,Integer>();
-		for (int n=0; n<Constants.HISTORY_SAMPLES_PER_SECOND; n++) {
-			if (historyIndex + n < Constants.HISTORY_SIZE) {
-				HashMap<String,Integer> sample = (HashMap<String,Integer>)history.get(historyIndex + n);
-				historyScores.putAll(sample);
-			}
-		}
-		scores = historyScores;
-		overrideBeep = true;
-	}
 
-	private static Component createHistoryUI() {		
-		JCheckBox live = new JCheckBox("live", true);
-		fluxController = new FluxController();
-		time = new JLabel();
-		time.setPreferredSize(new Dimension(65, 30));
-		Button previous = new Button("<");
-		previous.setPreferredSize(new Dimension(25, 20));
-		previous.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				travelBackInTime(live, fluxController.getValue() - 1);
-			}
-		});
-		Button next = new Button(">");
-		next.setPreferredSize(new Dimension(25, 20));
-		next.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				travelBackInTime(live, fluxController.getValue() + 2);
-			}
-		});
-		live.addChangeListener(new ChangeListener() {
-			public void stateChanged(ChangeEvent e) {
-				UI.live = live.isSelected();
-				if (UI.live) {
-					fluxController.setValue(Constants.HISTORY_SIZE);
-				}
-			}
-		});
-		fluxController.addChangeListener(new ChangeListener() {
-			public void stateChanged(ChangeEvent e) {
-				travelBackInTime(live, fluxController.getValue());
- 			}
-		});
-		Container container = new Container();
-		container.setLayout(new FlowLayout(FlowLayout.LEFT, 5, 1));
-		container.add(time);
-		container.add(previous);
-		container.add(fluxController);
-		container.add(next);
-		container.add(live);		
-		return container;
-	}  
+	public static void selectInstrument(int instrument) {
+		instrumentSelector.setSelectedIndex(instrument + 1);
+	}
+	
 }

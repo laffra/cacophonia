@@ -42,7 +42,6 @@ public class Agent {
         ProcessBuilder process = new ProcessBuilder("java", "-classpath", jarPath, "cacophonia.ui.UI");
         process.inheritIO();
         process.start();
-        Thread.sleep(1000);
 	}
 
 	static void setup() {

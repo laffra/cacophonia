@@ -1,5 +1,6 @@
 package cacophonia.runtime;
 
+import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -23,7 +24,7 @@ class RemoteUI {
 		try {
 			socket = new Socket("localhost",6666);
 			inputStream = new DataInputStream(socket.getInputStream());  
-			outputStream = new DataOutputStream(socket.getOutputStream());  
+			outputStream = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));  
 			this.setupListener();
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
@@ -37,21 +38,25 @@ class RemoteUI {
 			public void run() {
 				while (true) {
 					try {
-						Thread.sleep(200);
+						Thread.sleep(1000);
 						int command = inputStream.readInt();
 						String details = (String)inputStream.readUTF();
 						switch (command) {
-						case Constants.INSPECT_PLUGIN:
-							Method.trace(details, true);
+						case Constants.EVENT_INSPECT_PLUGIN:
+							for (String name : details.split(" ")) {
+								Method.trace(name, true);
+							}
 							break;
-						case Constants.UN_INSPECT_PLUGIN:
-							Method.trace(details, false);
+						case Constants.EVENT_UN_INSPECT_PLUGIN:
+							for (String name : details.split(" ")) {
+								Method.trace(name, false);
+							}
 							break;
-						case Constants.IMPORT_PLUGIN_FROM_SOURCE:
-						case Constants.IMPORT_PLUGIN_FROM_REPOSITORY:
+						case Constants.EVENT_IMPORT_PLUGIN_FROM_SOURCE:
+						case Constants.EVENT_IMPORT_PLUGIN_FROM_REPOSITORY:
 							System.err.println("Plugin import not implemented. Manually import " + details);
 							break;
-						case Constants.EXIT:
+						case Constants.EVENT_EXIT:
 							System.exit(0);
 							break;
 						}
@@ -72,8 +77,7 @@ class RemoteUI {
 				outputStream.flush(); 
 			}
 		} catch (Exception e) {
-			System.out.println("UI went away");
-			System.exit(0);
+			// ignore - UI went away - will exit soon
 		}  
 	}
 	

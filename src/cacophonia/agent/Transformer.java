@@ -1,8 +1,13 @@
 package cacophonia.agent;
 
+import java.io.File;
+import java.io.IOException;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
+import java.nio.file.Files;
 import java.security.ProtectionDomain;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashSet;
 
 import javassist.ByteArrayClassPath;
@@ -14,9 +19,12 @@ import javassist.CtMethod;
  * Transformer instruments each method with calls to the Cacopohonia runtime to inform it on enter/leave events.
  */
 class Transformer implements ClassFileTransformer {
+	static String HOME_DIR = System.getProperty("user.home") + "/.cacophonia";
 	int classLoadCount;
 	HashSet<ClassLoader> classLoaders = new HashSet<ClassLoader>();
-	boolean  debug = false;
+	boolean debug = false;
+	CacophoniaClassPool classPool = new CacophoniaClassPool();
+	long startMillis = System.currentTimeMillis();
 	
     @Override
     public byte[] transform(ClassLoader classLoader, String rawClassName, Class<?> classBeingRedefined,
@@ -29,9 +37,13 @@ class Transformer implements ClassFileTransformer {
         return classfileBuffer;
     }
     
-    private byte[] instrument(String className, byte[] classfileBuffer) {
+    byte[] instrument(String className, byte[] classfileBuffer) {
     	try {
-            CacophoniaClassPool classPool = new CacophoniaClassPool();
+    		return getFromCache(className);
+    	} catch (IOException e) {
+    		// not in cache
+    	}
+    	try {
             classPool.insertClassPath(new ByteArrayClassPath(className, classfileBuffer));
             CtClass classDefinition = classPool.get(className);
             if (classDefinition.isInterface()) {
@@ -47,32 +59,69 @@ class Transformer implements ClassFileTransformer {
         } catch (Exception e) {
             if (debug) e.printStackTrace();
         }
+		try {
+			putInCache(className, classfileBuffer);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		return classfileBuffer;
 	}
+    
+    byte[] getFromCache(String className) throws IOException {
+		return Files.readAllBytes(getCacheFile(className).toPath());
+    }
+    
+    void putInCache(String className, byte[] bytes) throws IOException {
+		Files.write(getCacheFile(className).toPath(), bytes);
+    }
+    
+    File getCacheFile(String className) {
+    	File file = new File(String.format("%s/%s.class", HOME_DIR, className.replace(".", "/")));
+    	if (!file.exists()) {
+    		file.getParentFile().mkdirs();
+    	}
+		return file;
+    }
 
-	private void trackStatistics(ClassLoader classLoader, String className) {
+	void trackStatistics(ClassLoader classLoader, String className) {
+		long seconds = (System.currentTimeMillis() - startMillis) / 1000;
     	if (!classLoaders.contains(classLoader)) {
         	String name = classLoader.toString();
         	if (name.startsWith("org.eclipse.")) {
         		classLoaders.add(classLoader);
-        		System.out.println(String.format("Load plugin %d for %s", classLoaders.size(), className));
+        		System.out.println(String.format("%s %ds Load plugin %d - %s", when(), seconds,
+        				classLoaders.size(), className));
         	}
         }
         if ((++classLoadCount % 500) == 0) {
-        	System.out.println(String.format("Loaded %d classes", classLoadCount));
+        	System.out.println(String.format("%s %ds Loaded %d classes", when(), seconds, classLoadCount));
         }
     }
-
-	private void instrumentMethod(String className, CtMethod method) throws CannotCompileException {
-		try {
-			method.insertBefore("cacophonia.runtime.Cacophonia.enter(\"" + method.getLongName() + "\", $0);");    	
-			method.insertAfter("cacophonia.runtime.Cacophonia.leave(\"" + method.getLongName() + "\", $0);");    	
-		} catch (Exception e) {
-            if (debug) System.out.println("Cannot instrument "+method.getName()+" "+method.getSignature());
-        }
+	
+	String when() {
+		return new SimpleDateFormat("HH:mm:ss").format(new Date());
 	}
 
-	private boolean isInstrumentable(String className) {
+	void instrumentMethod(String className, CtMethod method) throws CannotCompileException {
+		try {
+			instrumentEnterLeave(method, "$0");
+		} catch (Exception e1) {
+			try {
+				instrumentEnterLeave(method, "null");
+			} catch (Exception e2) {
+				if (debug) System.out.println("Cannot instrument " + e2 + ": " + className + " " + method.getName());
+			}
+        }
+	}
+	
+	void instrumentEnterLeave(CtMethod method, String self) throws CannotCompileException {
+		String enter = String.format("cacophonia.runtime.Cacophonia.enter(\"%s\", %s);", method.getLongName(), self);    	
+		method.insertBefore(enter);
+		String leave = String.format("cacophonia.runtime.Cacophonia.leave(\"%s\", %s);", method.getLongName(), self);    	
+		method.insertAfter(leave);
+	}
+
+	boolean isInstrumentable(String className) {
 		if (isJavaClass(className) || className.startsWith("cacophonia.")) return false;
 		if (className.startsWith("org.eclipse.osgi.")) return false;
 		if (className.startsWith("org.eclipse.equinox.")) return false;
@@ -81,7 +130,7 @@ class Transformer implements ClassFileTransformer {
 		return true;
 	}
 
-	private boolean isJavaClass(String className) {
+	boolean isJavaClass(String className) {
 		return (className.startsWith("jdk.") || 
 				className.startsWith("java.") || 
 				className.startsWith("sun.") || 
