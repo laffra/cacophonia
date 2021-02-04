@@ -223,7 +223,7 @@ public class Plugin extends Component {
 
 	public void paint(java.awt.Graphics graphics) {
 		Graphics2D g = (Graphics2D)graphics;
-		if (getAge() < 0) return;
+		if (node == null || getAge() < 0) return;
 		setTransparancy(g);
 		setBorderWidth(g);
 		setBackgroundColor(g);

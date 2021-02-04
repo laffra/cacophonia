@@ -145,7 +145,11 @@ public class Graph extends JPanel {
 	public Edge addEdge(Node from, Node to, double weight, double decay, double length, double force, int level, Color color) {
 		Edge edge = new Edge(from, to, weight, decay, length, force, level, color, this);
 		if (edgeToIndex.containsKey(edge)) {
-			edges.set(edgeToIndex.get(edge), edge);
+			try {
+				edges.set(edgeToIndex.get(edge), edge);
+			} catch (IndexOutOfBoundsException e) {
+				// this happens when the graph is cleared while new edges arrive
+			}
 		} else {
 			edgeToIndex.put(edge, edges.size());
 			edges.add(edge);
