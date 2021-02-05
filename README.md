@@ -26,7 +26,7 @@ By now, you should see something looking like this:
  
  - This will launch the Cacophonia UI:
  
-   ![Cacophonia UI](/images/ui-launch.png)
+   ![Cacophonia UI](/images/cacophonia-ui.png)
  
 ## Enabling Sound
 
@@ -38,7 +38,7 @@ Inside the Cacophonia UI, you can enable sounds when certain plugins interact:
    - All instruments will be muted.
    - Select a given plugin (e.g., `swt`) and then choose an instrument (e.g., `xylophone`) from the dropdown:
 
-     ![Cacophonia UI](/images/ui-swt-xylophone.png)
+     ![Cacophonia UI](/images/core-jobs-organ.png)
  
    - If you hear nothing, toggle the mute button.
    
