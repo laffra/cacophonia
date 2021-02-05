@@ -15,6 +15,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.TextEvent;
 import java.awt.event.TextListener;
 import java.io.BufferedInputStream;
@@ -34,12 +36,14 @@ import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.KeyStroke;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
 import cacophonia.Constants;
 import cacophonia.DetailLevel;
 import cacophonia.ui.graph.Graph;
+import cacophonia.ui.graph.Node;
 import cacophonia.ui.graph.PopupMenuListener;
 import cacophonia.ui.graph.Settings;
 
@@ -72,6 +76,7 @@ public class UI {
 	static Graph graph;
 	static Settings graphSettings = new Settings();
 	static JobManager jobManager;
+	static double currentScale = 1.0;
 	
 
 	public static void main(String args[]) {
@@ -191,7 +196,7 @@ public class UI {
 		});
 		jobManager = new JobManager(graph);
 		mainContainer.add(graph, BorderLayout.CENTER);
-		
+
 		frame.setSize(Constants.WIDTH, Constants.HEIGHT);
 	    frame.setLocationRelativeTo(null);
 		frame.setVisible(true);
@@ -234,23 +239,18 @@ public class UI {
 	static Component createFilterUI() {
 		Container container = new Container();
 		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
+
 		Button clear = new Button("clear");
 		clear.addActionListener(new ActionListener() {			
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				Plugin.clear();
 				graph.clear();
+				Node.clear();
 			}
 		});
 		container.add(clear);
-		Button shake = new Button("shake");
-		shake.addActionListener(new ActionListener() {			
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				graph.shake();
-			}
-		});
-		container.add(shake);
+
 		container.add(new Label("focus:"));
 		TextField filter = new TextField(30);
 		filter.addTextListener(new TextListener() {	
@@ -261,6 +261,7 @@ public class UI {
 				Plugin.focusUpdated();
 			}
 		});
+
 		filter.setText(UI.pluginFilter = UI.preferences.get("filter", ""));
 		container.add(filter);
 		JCheckBox jobs = new JCheckBox("jobs", false);
@@ -272,7 +273,6 @@ public class UI {
 		container.add(jobs);
 		
 		JComboBox<String> levelSelector = new JComboBox<String>(new String[] { "Feature", "Plugin", "Fragment" });
-		levelSelector.setMaximumRowCount(64);
 		levelSelector.addActionListener(new ActionListener() {	
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -288,15 +288,41 @@ public class UI {
 
 	static Container createHeader() {
 		Container header = new Container();
-		header.setPreferredSize(new Dimension(800, 40));
 		header.setLayout(new FlowLayout(FlowLayout.CENTER, 15, 5));
-		header.setPreferredSize(new Dimension(Constants.WIDTH,40));
+		header.setPreferredSize(new Dimension(Constants.WIDTH, 40));
 		return header;
 	}
 
 	static Component createThemeUI() {
 		Container container = new Container();
 		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
+
+		JComboBox<String> scale = new JComboBox<String>(new String[] { "M", "L", "XL", "XXL" });
+		double scales[] = {1.0, 1.5, 2, 4};
+		scale.addActionListener(new ActionListener() {	
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				currentScale = scales[scale.getSelectedIndex()];
+				Plugin.setScale(currentScale);
+			}
+		});
+		scale.addKeyListener(new KeyAdapter() {
+			@Override
+			public void keyPressed(KeyEvent e) {
+				char key = e.getKeyChar();
+				String modifiers = KeyEvent.getModifiersExText(e.getModifiersEx());
+				if (modifiers.equals("⌘") && key == '=' && scale.getSelectedIndex() < scales.length - 1) {
+					scale.setSelectedIndex(scale.getSelectedIndex() + 1);
+				}
+				if (modifiers.equals("⌘") && key == '-' && scale.getSelectedIndex() > 0) {
+					scale.setSelectedIndex(scale.getSelectedIndex() - 1);
+				}
+				super.keyPressed(e);
+			}
+		});
+		scale.requestFocus();
+		container.add(scale);
+
 		JCheckBox checkbox = new JCheckBox("mute", true);
 		checkbox.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
@@ -307,6 +333,7 @@ public class UI {
 			}
 		});
 		container.add(checkbox);
+
 		Choice themeChooser = new Choice();
 		for (SoundTheme theme: SoundTheme.themes) {
 			themeChooser.add(theme.name);  
@@ -321,6 +348,7 @@ public class UI {
 		selectSoundTheme(lastTheme);
 		themeChooser.select(lastTheme);
 		container.add(themeChooser);
+
 		return container;
 	}
 	

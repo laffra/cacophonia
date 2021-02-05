@@ -35,14 +35,8 @@ public class Plugin extends Component {
 			AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f),
 			AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f),
 	};
-	static Font fonts[] = {
-		    new Font("Courier New", Font.PLAIN, Constants.FONT_SIZE - 6),
-		    new Font("Courier New", Font.PLAIN, Constants.FONT_SIZE - 3),
-		    new Font("Courier New", Font.PLAIN, Constants.FONT_SIZE),
-		    new Font("Courier New", Font.PLAIN, Constants.FONT_SIZE),
-		    new Font("Courier New", Font.PLAIN, Constants.FONT_SIZE),
-		    new Font("Courier New", Font.PLAIN, Constants.FONT_SIZE)
-	};
+	static double currentScale = 1;
+	static Font fonts[] = getFonts();
 	static Color colors[] = {
 			new Color(204, 133, 154), // pink
 			new Color(144, 201, 120), // pistachio
@@ -51,6 +45,7 @@ public class Plugin extends Component {
 			new Color(255, 185, 179), // melon
 			new Color(210, 145, 188)  // violet
 	};
+	static Font statisticsFont = new Font("Courier New", Font.PLAIN, Constants.FONT_SIZE);
 	static Map<String,Color> filterColors = new HashMap<>();
 	static boolean showJobs = false;
 	static int pluginsShowing;
@@ -58,6 +53,7 @@ public class Plugin extends Component {
 	static Plugin selectedPlugin;
 	static SelectionListener selectionListener;
 	static PaintListener paintListener;
+
 
 	Set<String> family = new HashSet<String>();
 	String[] names;
@@ -195,7 +191,7 @@ public class Plugin extends Component {
 		String maxMemory = Util.formatSize(Runtime.getRuntime().maxMemory());
 		String totalMemory = Util.formatSize(Runtime.getRuntime().totalMemory());
 		String myMemory = String.format("Cacophonia: memory=%s/%s", totalMemory, maxMemory);
-		g.setFont(fonts[fonts.length - 1]);
+		g.setFont(statisticsFont);
 		g.setColor(Color.YELLOW);
 		g.setComposite(Plugin.opaque);
 		g.drawString("Eclipse:    " + UI.statistics, 10, Constants.HEIGHT - 85);
@@ -230,17 +226,19 @@ public class Plugin extends Component {
 		int adjust = (int)(3 * (Constants.HEART_BEAT - getAge()));
 		int x = getX() + adjust;
 		int y = getY() + adjust;
-		int size = Constants.PLUGIN_SIZE - 2 * adjust;
+		int size = (int)(currentScale * Constants.PLUGIN_SIZE - 2 * adjust);
 		g.fillOval(x, y, size, size);
 		setBorderColor(g);
 		g.drawOval(x, y, size, size);
 		setTextColor(g);
 		setFont(g);
-		g.setClip(getX(), getY(), Constants.PLUGIN_SIZE, Constants.PLUGIN_SIZE);
-		int yOffset = (Constants.PLUGIN_SIZE / 11 - names.length) / 2 * 11;
+		g.setClip(getX(), getY(), size, size);
+		int fontWidth = (int)(8 * currentScale);
+		int fontHeight = (int)(11 * currentScale);
+		int yOffset = (size / fontHeight - names.length) / 2 * fontHeight;
 		for (int n=0; n<names.length; n++) {
-			int xOffset = size / 2 - 8 * names[n].length() / 2;
-			g.drawString(names[n], x + xOffset, y + yOffset + (n+1) * 11);
+			int xOffset = (int)(size / 2 - fontWidth * names[n].length() / 2);
+			g.drawString(names[n], x + xOffset, y + yOffset + (n+1) * fontHeight);
 		}
 		g.setClip(null);
 		if (instrument != -1) {
@@ -340,6 +338,22 @@ public class Plugin extends Component {
 	@Override
 	public boolean equals(Object other) {
 		return other instanceof Plugin && ((Plugin)other).name.equals(name);
+	}
+
+	public static void setScale(double scale) {
+		currentScale = scale;
+		fonts = getFonts();
+	}
+	
+	static Font[] getFonts() {
+		return new Font[] {
+		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE - 6),
+		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE - 3),
+		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE),
+		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE),
+		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE),
+		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE)
+		};
 	}
 
 }
