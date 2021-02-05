@@ -246,12 +246,6 @@ public class Graph extends JPanel {
 		getNode(component).setAge(age);
 	}
 	
-	public void shake() {
-		for (Node node: nodes) {
-			node.setInitialLocation();
-		}
-	}
-	
 	Node findNode(int x, int y) {
 		for (int n=nodes.size() - 1; n>=0; n--) {
 			Node node = nodes.get(n);
@@ -326,6 +320,5 @@ public class Graph extends JPanel {
 		int size = settings.averageNodeSize;
 		return p.x > size && p.y > size && p.x < settings.width - 2 * size && p.y < settings.height - 3 * size;
 	}
-
 
 }
