@@ -7,6 +7,7 @@ import java.awt.Component;
 import java.awt.Composite;
 import java.awt.Font;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -19,6 +20,7 @@ import cacophonia.ui.graph.Graph;
 import cacophonia.ui.graph.Node;
 import cacophonia.ui.graph.PaintListener;
 import cacophonia.ui.graph.SelectionListener;
+import cacophonia.ui.graph.Vector;
 
 /**
  * Represents a plugin. Its name will be abbreviated. Each plugin has its own location in the canvas it is drawn on.
@@ -47,15 +49,13 @@ public class Plugin extends Component {
 	};
 	static Font statisticsFont = new Font("Courier New", Font.PLAIN, Constants.FONT_SIZE);
 	static Map<String,Color> filterColors = new HashMap<>();
-	static boolean showJobs = false;
-	static int pluginsShowing;
 	static DetailLevel detailLevel = DetailLevel.FEATURE;
 	static Plugin selectedPlugin;
 	static SelectionListener selectionListener;
 	static PaintListener paintListener;
 
 
-	Set<String> family = new HashSet<String>();
+	Set<String> relatedPluginNames = new HashSet<String>();
 	String[] names;
 	String fullName, name;
 	int instrument, note;
@@ -82,7 +82,7 @@ public class Plugin extends Component {
 		}
 		setSize(Constants.PLUGIN_SIZE, Constants.PLUGIN_SIZE);
 		setFocus();
-		setFamily();
+		setRelated(graph);
 		setupListeners(graph);
 	}
 
@@ -117,12 +117,42 @@ public class Plugin extends Component {
 		graph.addPaintListener(paintListener);
 	}
 
-	void setFamily() {
+	void setRelated(Graph graph) {
 		if (detailLevel == DetailLevel.FRAGMENT) {
-			family = PluginRegistry.getFamilyForFragment(name);
+			relatedPluginNames = PluginRegistry.getFamilyForFragment(name);
 		}
 		if (detailLevel == DetailLevel.PLUGIN) {
-			family = PluginRegistry.getFamilyForPlugin(name);
+			relatedPluginNames = PluginRegistry.getFamilyForPlugin(name);
+		}
+		for (String name: relatedPluginNames) {
+			if (!plugins.containsKey(name)) continue;
+			Plugin relatedPlugin = plugins.get(name);
+			graph.addEdge(this.node, relatedPlugin.node,
+				graph.settings.relatedEdgeWeight,
+				graph.settings.relatedEdgeDecay, 
+				graph.settings.relatedEdgeLength,
+				graph.settings.relatedEdgeAttractionForce,
+				graph.settings.relatedEdgeLevel,
+				graph.settings.relatedEdgeColor
+			);
+		}
+		String[] filters = UI.pluginFilter.split(",");
+		for (String filter: filters) {
+			if (filter.length() > 0 && name.indexOf(filter) != -1) {
+				for (Plugin other: plugins.values()) {
+					if (other == this) continue;
+					if (other.name.indexOf(filter) != -1) {
+						graph.addEdge(this.node, other.node,
+							graph.settings.relatedEdgeWeight,
+							graph.settings.relatedEdgeDecay, 
+							graph.settings.relatedEdgeLength,
+							graph.settings.relatedEdgeAttractionForce,
+							graph.settings.relatedEdgeLevel,
+							graph.settings.relatedEdgeColor
+						);
+					}
+				}
+			};
 		}
 	}
 
@@ -216,17 +246,38 @@ public class Plugin extends Component {
 	public boolean asleep() {
 		return getAge() < 0;
 	}
+	
+	@Override
+	public Rectangle getBounds() {
+		Rectangle area = super.getBounds();
+		int size = getPluginSize();
+		area.width = size;
+		area.height = size;
+		return area;
+	}
+	
+	int getPluginOffset() {
+		return (int)(3 * (Constants.HEART_BEAT - getAge()));
+	}
+	
+	int getPluginSize() {
+		return (int)(currentScale * Constants.PLUGIN_SIZE - 2 * getPluginOffset());
+	}
 
 	public void paint(java.awt.Graphics graphics) {
 		Graphics2D g = (Graphics2D)graphics;
+		if (node.graph.settings.debug) {
+			g.setColor(Color.WHITE);
+			g.drawString(name, getX(), getY());
+		}
 		if (node == null || getAge() < 0) return;
 		setTransparancy(g);
 		setBorderWidth(g);
 		setBackgroundColor(g);
-		int adjust = (int)(3 * (Constants.HEART_BEAT - getAge()));
-		int x = getX() + adjust;
-		int y = getY() + adjust;
-		int size = (int)(currentScale * Constants.PLUGIN_SIZE - 2 * adjust);
+		int offset = getPluginOffset();
+		int x = getX() + offset;
+		int y = getY() + offset;
+		int size = getPluginSize();
 		g.fillOval(x, y, size, size);
 		setBorderColor(g);
 		g.drawOval(x, y, size, size);
@@ -249,6 +300,22 @@ public class Plugin extends Component {
 			setInspectColor(g);
 			g.setStroke(new BasicStroke(2));
 			g.fillOval(x + 15, y + size - 13, 10, 10);
+		}
+		if (node.locationFixed) {
+			g.setColor(Color.RED);
+			g.setStroke(new BasicStroke(2));
+			g.drawString("#", x - 2, y + 2 + size);
+		}
+		if (node.graph.settings.debug) {
+			setNumberColor(g);
+			g.drawString(String.format("f=%.3f a=%.1f", node.vector.force, node.vector.angle), x, y-5);
+			g.setColor(Color.RED);
+			g.setStroke(new BasicStroke(2));
+			int vx = (int)node.vector.getX(x);
+			int vy = (int)node.vector.getY(y);
+			g.drawLine(x, y, vx, vy);
+			g.setStroke(new BasicStroke(1));
+			g.drawOval(vx - 2, vy - 2, 5, 5);
 		}
 	}
 	
@@ -347,12 +414,12 @@ public class Plugin extends Component {
 	
 	static Font[] getFonts() {
 		return new Font[] {
-		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE - 6),
-		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE - 3),
-		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE),
-		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE),
-		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE),
-		    new Font("Courier New", Font.PLAIN, (int)currentScale * Constants.FONT_SIZE)
+		    new Font("Courier New", Font.PLAIN, (int)(currentScale * Constants.FONT_SIZE - 6)),
+		    new Font("Courier New", Font.PLAIN, (int)(currentScale * Constants.FONT_SIZE - 3)),
+		    new Font("Courier New", Font.PLAIN, (int)(currentScale * Constants.FONT_SIZE)),
+		    new Font("Courier New", Font.PLAIN, (int)(currentScale * Constants.FONT_SIZE)),
+		    new Font("Courier New", Font.PLAIN, (int)(currentScale * Constants.FONT_SIZE)),
+		    new Font("Courier New", Font.PLAIN, (int)(currentScale * Constants.FONT_SIZE))
 		};
 	}
 

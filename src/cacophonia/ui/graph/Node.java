@@ -10,13 +10,13 @@ import java.util.prefs.Preferences;
 public class Node {
 	static Preferences preferences = Preferences.userNodeForPackage(Node.class);
 
-	Graph graph;
-	Component component;
-	double age;
-	double damping; 
-	Vector vector = new Vector(0.0, 0.0);
-	Point mouseOffset = new Point();
-	boolean locationFixed;
+	public Graph graph;
+	public Component component;
+	public double age;
+	public double damping; 
+	public Vector vector = new Vector(0.0, 0.0);
+	public Point mouseOffset = new Point();
+	public boolean locationFixed;
 
 	Node(Component component, Graph graph) {
 		this.component = component;
@@ -108,17 +108,18 @@ public class Node {
 
 	void applyCalculatedForces() {
 		if (locationFixed || vector.force == 0.0) return;
-		vector.force = Math.min(vector.force, graph.settings.maxForce);
-		Point point = component.getLocation();
-		point.x += vector.force * vector.getX() + 0.1;
-		point.y += vector.force * vector.getY() + 0.1;
-		moveTo(point);
+		moveTo((int)vector.getX(getX()), (int)vector.getY(getY()));
 	}
 	
-	void moveTo(Point point) {
-		if (graph.contains(point)) {
-			component.setLocation(point.x, point.y);
-		}
+	void moveTo(int x, int y) {
+		int w = graph.settings.width;
+		int h = graph.settings.height;
+		int radius = graph.settings.averageNodeSize;
+		x = Math.max(x, 5);
+		y = Math.max(y, 5 + radius);
+		x = Math.min(x, w - 2 * radius);
+		y = Math.min(y, h - 3 * radius);
+		component.setLocation(x, y);
 	}
 
 	public double getAge() {

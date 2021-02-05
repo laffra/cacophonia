@@ -63,12 +63,14 @@ class Edge {
 	}
 
 	void attractNodes() {
-		if (weight < 1) return;
+		if (weight < 1 || from.getAge() < 1 || to.getAge() < 1) return;
 		double distance = Math.max(1, from.getDistance(to));
 		double force = this.force * Math.sqrt(Math.sqrt(distance));
 		if (distance < length) return;
-		from.vector.add(new Vector(from.damping * force, from.getAngleTo(to)));
-		to.vector.add(new Vector(to.damping * force, to.getAngleTo(from)));
+		double fromForce = to.locationFixed ? 2 * force : force;
+		double toForce = from.locationFixed ? 2 * force : force;
+		from.vector.add(new Vector(from.damping * fromForce, from.getAngleTo(to)));
+		to.vector.add(new Vector(to.damping * toForce, to.getAngleTo(from)));
 	}
 	
 	public static void paintAll(Graph graph, Graphics2D g) {
@@ -88,9 +90,12 @@ class Edge {
 	}
 	
 	@Override
-	public boolean equals(Object other) {
-		return other instanceof Edge && ((Edge)other).from == from &&
-				((Edge)other).to == to && ((Edge)other).color == color;
+	public boolean equals(Object otherObject) {
+		if (!(otherObject instanceof Edge)) return false;
+		Edge other = (Edge)otherObject;
+		boolean sameNodes = other.from == from && other.to == to || other.to == from && other.from == to;
+		boolean sameColor = ((Edge)other).color == color;
+		return sameNodes && sameColor;
 	}
 
 }

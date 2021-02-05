@@ -10,6 +10,8 @@ import java.awt.Graphics2D;
 import java.awt.Label;
 import java.awt.Point;
 import java.awt.PopupMenu;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -18,7 +20,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import javax.swing.JCheckBox;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
 import javax.swing.event.ChangeEvent;
@@ -27,7 +31,7 @@ import javax.swing.event.ChangeListener;
 
 public class Graph extends JPanel {
 
-	Settings settings;
+	public Settings settings;
 
 	private Map<Component,Node> nameToNodes;
 	private List<Node> nodes;
@@ -55,10 +59,9 @@ public class Graph extends JPanel {
 		center.component.setLocation(new Point(settings.width/2, settings.height/2));
 		setLocation(0, 0);
 		setSize(new Dimension(settings.width, settings.height));
-		image = new BufferedImage(settings.width, settings.height, BufferedImage.TYPE_INT_ARGB);
-		imageGraphics = (Graphics2D) image.getGraphics();
 		setupListeners();
 		addControls();
+		addDebugToggle();
 	}
 
 	void start() {
@@ -69,8 +72,21 @@ public class Graph extends JPanel {
 				while (true) {
 					try {
 						layoutGraph();
+						Thread.sleep((long)Math.max(layoutDamage, settings.layoutDelay));
+						layoutDamage = 0;
+					} catch (Exception e) {
+						// ignore
+					}
+				}
+			}
+		}).start();
+		new Thread(new Runnable() {
+			public void run() {
+				while (true) {
+					try {
 						repaint();
-						Thread.sleep((long)Math.max(layoutDamage, settings.redrawDelay));
+						header.repaint();
+						Thread.sleep(settings.redrawDelay);
 						layoutDamage = 0;
 					} catch (Exception e) {
 						// ignore
@@ -159,10 +175,12 @@ public class Graph extends JPanel {
 	}
 
 	public void layoutGraph() {
+		for (Node node: nodes) {
+			node.reset();
+		}
 		List<Node> sortedNodes = getNodes();
 		for (int n=0; n<settings.maxLayoutIterationCount; n++) {
 			for (Node node: sortedNodes) {
-				node.reset();
 				node.repulseFromOtherNodes();
 				node.attractToCenter(center);
 				node.dampen();
@@ -182,7 +200,10 @@ public class Graph extends JPanel {
 	}
 
 	List<Node> getNodes() {
-		List<Node> copy = new ArrayList<Node>(nodes);
+		List<Node> copy = new ArrayList<Node>(nodes)
+				.stream()
+				.filter(node -> node.age > 0)
+				.collect(Collectors.toList());
 		copy.sort(Comparator.comparing(Node::getAge));
 		return copy;
 	}
@@ -193,12 +214,17 @@ public class Graph extends JPanel {
 		add(header);
 		addRepelForceSlider();
 		addCallForceSlider();
+		addRelatedForceSlider();
 		addHistoryForceSlider();
 	}
 
+	void removeControls() {
+		if (header != null) remove(header);
+	}
+
 	void addCallForceSlider() {
-		header.add(new Label("call force:"));
-		JSlider slider = new JSlider(0, 200, (int)(settings.callEdgeAttractionForce * 100));
+		header.add(new Label("call:"));
+		JSlider slider = new JSlider(0, 200, (int)(100.0 * settings.callEdgeAttractionForce));
 		slider.setBackground(Color.white);
 		slider.setSize(200, 25);
 		slider.addChangeListener(new ChangeListener() {
@@ -211,8 +237,8 @@ public class Graph extends JPanel {
 	}
 
 	void addHistoryForceSlider() {
-		header.add(new Label("history force:"));
-		JSlider slider = new JSlider(0, 200, (int)(settings.historyEdgeAttractionForce * 100));
+		header.add(new Label("history:"));
+		JSlider slider = new JSlider(0, 200, (int)(100.0 * settings.historyEdgeAttractionForce));
 		slider.setBackground(Color.white);
 		slider.setSize(200, 25);
 		slider.addChangeListener(new ChangeListener() {
@@ -224,9 +250,33 @@ public class Graph extends JPanel {
 		header.add(slider);
 	}
 
+	void addRelatedForceSlider() {
+		header.add(new Label("related:"));
+		JSlider slider = new JSlider(0, 200, (int)(100.0 * settings.relatedEdgeAttractionForce));
+		slider.setBackground(Color.white);
+		slider.setSize(200, 25);
+		slider.addChangeListener(new ChangeListener() {
+			public void stateChanged(ChangeEvent e) {
+				settings.relatedEdgeAttractionForce = (double)slider.getValue() / 100.0;
+				System.out.println(String.format("Related force: %s", settings.relatedEdgeAttractionForce));
+			}
+		});
+		header.add(slider);
+	}
+
+	void addDebugToggle() {
+		JCheckBox checkbox = new JCheckBox("debug", false);
+		checkbox.addChangeListener(new ChangeListener() {
+			public void stateChanged(ChangeEvent e) {
+				settings.debug = !settings.debug;
+			}
+		});
+		header.add(checkbox);
+	}
+
 	void addRepelForceSlider() {
-		header.add(new Label("repel force:"));
-		JSlider slider = new JSlider(0, 10000, (int)(settings.callEdgeAttractionForce * 5000));
+		header.add(new Label("repel:"));
+		JSlider slider = new JSlider(0, 20000, (int)settings.repulsionForce);
 		slider.setBackground(Color.white);
 		slider.setSize(200, 25);
 		slider.addChangeListener(new ChangeListener() {
@@ -269,6 +319,15 @@ public class Graph extends JPanel {
 	}
 	
 	void setupListeners() {
+		addComponentListener(new ComponentAdapter() {
+			@Override
+			public void componentResized(ComponentEvent e) {
+				image = new BufferedImage(settings.width, settings.height, BufferedImage.TYPE_INT_ARGB);
+				imageGraphics = (Graphics2D) image.getGraphics();
+				super.componentResized(e);
+			}
+		});
+
 		addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
@@ -286,16 +345,22 @@ public class Graph extends JPanel {
 	    	public void mouseClicked(MouseEvent e) {
 				Node node = findNode(e.getX(), e.getY());
 	    		if (node == null) return;
-	    		if (e.getButton() != 1) {
+	    		switch (e.getButton()) {
+	    		case 1:
+	    			node.locationFixed = !node.locationFixed;
+	    			break;
+	    		case 2:
 					for (PopupMenuListener listener: popupMenuListeners) {
 						PopupMenu menu = listener.createMenu(node.component);
 						add(menu);
 						menu.show(Graph.this, e.getX(), e.getY());
 					}
+	    			break;
 	    		}
 				super.mouseClicked(e);
 	    	}
 		});
+
 		addMouseMotionListener(new MouseAdapter() {
 			@Override
 			public void mouseDragged(MouseEvent e) {
@@ -315,10 +380,4 @@ public class Graph extends JPanel {
 		});
 	}
 	
-	@Override
-	public boolean contains(Point p) {
-		int size = settings.averageNodeSize;
-		return p.x > size && p.y > size && p.x < settings.width - 2 * size && p.y < settings.height - 3 * size;
-	}
-
 }

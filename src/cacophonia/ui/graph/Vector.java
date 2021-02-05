@@ -1,8 +1,8 @@
 package cacophonia.ui.graph;
 
-class Vector {
-	double angle;
-	double force;
+public class Vector {
+	public double angle;
+	public double force;
 	
 	public Vector(double force, double angle) {
 		this.force = force;
@@ -14,15 +14,23 @@ class Vector {
 		force = 0.0;
 	}
 	
-	double getX() {
+	public double getX(int x) {
+		return x + getX();
+	}
+	
+	public double getY(int y) {
+		return y + getY();
+	}
+	
+	public double getX() {
 		return force * Math.cos((Math.PI / 180.0) * angle);
 	}
 
-	double getY() {
+	public double getY() {
 		return force * Math.sin((Math.PI / 180.0) * angle);
 	}
 
-	Vector add(Vector other) {
+	public Vector add(Vector other) {
 		double x = other.getX() + getX();
 		double y = other.getY() + getY();
 		force = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));

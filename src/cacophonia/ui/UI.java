@@ -13,6 +13,8 @@ import java.awt.PopupMenu;
 import java.awt.TextField;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.awt.event.KeyAdapter;
@@ -36,7 +38,6 @@ import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.KeyStroke;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -81,8 +82,8 @@ public class UI {
 
 	public static void main(String args[]) {
 		try {
-			setupListener();
 	    	createUI();
+			setupListener();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -196,6 +197,16 @@ public class UI {
 		});
 		jobManager = new JobManager(graph);
 		mainContainer.add(graph, BorderLayout.CENTER);
+		
+		frame.addComponentListener(new ComponentAdapter() {
+		    public void componentResized(ComponentEvent componentEvent) {
+		    	Dimension size = frame.getSize();
+		        graphSettings.width = size.width;
+		        graphSettings.height = size.height - 40;
+		        graph.setSize(size);
+				clear();
+		    }
+		});
 
 		frame.setSize(Constants.WIDTH, Constants.HEIGHT);
 	    frame.setLocationRelativeTo(null);
@@ -244,9 +255,7 @@ public class UI {
 		clear.addActionListener(new ActionListener() {			
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				Plugin.clear();
-				graph.clear();
-				Node.clear();
+				clear();
 			}
 		});
 		container.add(clear);
@@ -286,6 +295,12 @@ public class UI {
 		return container;
 	}
 
+	protected static void clear() {
+		Plugin.clear();
+		graph.clear();
+		Node.clear();
+	}
+
 	static Container createHeader() {
 		Container header = new Container();
 		header.setLayout(new FlowLayout(FlowLayout.CENTER, 15, 5));
@@ -297,8 +312,9 @@ public class UI {
 		Container container = new Container();
 		container.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
 
-		JComboBox<String> scale = new JComboBox<String>(new String[] { "M", "L", "XL", "XXL" });
-		double scales[] = {1.0, 1.5, 2, 4};
+		JComboBox<String> scale = new JComboBox<String>(new String[] { "XS", "S", "M", "L", "XL", "XXL" });
+		double scales[] = {0.6, 0.8, 1.0, 1.5, 2, 4};
+		scale.setSelectedIndex(2);
 		scale.addActionListener(new ActionListener() {	
 			@Override
 			public void actionPerformed(ActionEvent e) {

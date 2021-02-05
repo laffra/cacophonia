@@ -4,6 +4,7 @@ import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
@@ -21,26 +22,47 @@ class RemoteUI {
 	DataOutputStream outputStream;
 
 	public RemoteUI() {
+		this.setupListener();
+	}
+
+	DataInputStream getInputStream() {
+		if (inputStream != null) return inputStream;
 		try {
-			socket = new Socket("localhost",6666);
+			if (socket == null) {
+				socket = new Socket("localhost",6666);
+			}
 			inputStream = new DataInputStream(socket.getInputStream());  
-			outputStream = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));  
-			this.setupListener();
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}  
+		return inputStream;
 	}
-	
+
+	DataOutputStream getOutputStream() {
+		if (outputStream != null) return outputStream;
+		try {
+			if (socket == null) {
+				socket = new Socket("localhost",6666);
+			}
+			outputStream = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));  
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}  
+		return outputStream;
+	}
+
 	private void setupListener() {
 		new Thread(new Runnable() {
 			public void run() {
 				while (true) {
 					try {
-						Thread.sleep(1000);
-						int command = inputStream.readInt();
-						String details = (String)inputStream.readUTF();
+						Thread.sleep(2000);
+						int command = getInputStream().readInt();
+						String details = (String)getInputStream().readUTF();
 						switch (command) {
 						case Constants.EVENT_INSPECT_PLUGIN:
 							for (String name : details.split(" ")) {
@@ -72,9 +94,10 @@ class RemoteUI {
 	public void sendEvent(int type, String message) {
 		try {
 			synchronized (socket) {
-				outputStream.writeInt(type);
-				outputStream.writeUTF(message);
-				outputStream.flush(); 
+				DataOutputStream stream = getOutputStream();
+				stream.writeInt(type);
+				stream.writeUTF(message);
+				stream.flush(); 
 			}
 		} catch (Exception e) {
 			// ignore - UI went away - will exit soon
@@ -83,7 +106,8 @@ class RemoteUI {
 	
 	void close() {
 		try {
-			outputStream.close();
+			getInputStream().close();
+			getOutputStream().close();
 			socket.close();   
 		} catch (Exception e) {
 			e.printStackTrace();

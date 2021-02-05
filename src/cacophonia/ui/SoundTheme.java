@@ -43,7 +43,7 @@ class SoundTheme {
 	
 	int getNote(String pluginName) {
 		// Return a note related to the plugin's name, random, but the same each run
-		return 80 + pluginName.hashCode() % 48;
+		return 40 + pluginName.hashCode() % 48;
 	}
 	
 	static {
