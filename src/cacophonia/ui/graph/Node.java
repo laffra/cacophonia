@@ -4,6 +4,7 @@ import java.awt.Component;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
 public class Node {
@@ -166,6 +167,14 @@ public class Node {
 		double force = getDistance(getX() + dx, getY() + dy);
 		double angle = getAngleTo(getX() + dx, getY() + dy);
 		vector.add(new Vector(force, angle));
+	}
+	
+	public static void clear() {
+		try {
+			preferences.clear();
+		} catch (BackingStoreException e) {
+			e.printStackTrace();
+		}
 	}
 
 }
