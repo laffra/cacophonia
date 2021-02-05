@@ -50,14 +50,18 @@ class SoundTheme {
 		UI.currentSoundTheme = new SoundTheme("Cacophonia");
 		themes = new SoundTheme[] {
 				UI.currentSoundTheme,
-				new SoundTheme("Custom Theme 1"),
-				new SoundTheme("Custom Theme 2"),
-				new SoundTheme("Custom Theme 3"),
+				new SoundTheme("Theme 1"),
+				new SoundTheme("Theme 2"),
+				new SoundTheme("Theme 3"),
 		};
 	}
 
-	public void setInstrument(String instrumentName, int instrument) {
-		pluginToInstrument.put(instrumentName, instrument);
+	public void setInstrument(String pluginName, int instrument) {
+		pluginToInstrument.put(pluginName, instrument);
 		saveTheme();
+	}
+	
+	public String getName() {
+		return name;
 	}
 }
