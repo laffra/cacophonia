@@ -2,9 +2,9 @@
 
 This project visualizes Eclipse to better understand how it works internally.
 
-![Cacophonia UI](/images/animation.gif)
+![Cacophonia UI](/images/animation-graph.gif)
 
-See a recording with sound [here](https://vimeo.com/496876600/3f60a88207).
+See a recording with sound [here](https://vimeo.com/509059065/c1e5a35812).
 
 ## Setup
 
@@ -26,19 +26,20 @@ By now, you should see something looking like this:
  
  - This will launch the Cacophonia UI:
  
-   ![Cacophonia UI](/images/ui-launch.png)
+   ![Cacophonia UI](/images/cacophonia-ui.png)
  
 ## Enabling Sound
 
 Inside the Cacophonia UI, you can enable sounds when certain plugins interact:
 
  - Click the `mute` checkbox in the UI to toggle sound.
- - Switch sound themes by choosing a different theme in the dropdown showing `Suspense`.
- - Choose your own instruments by checking `manual`:
-   - All instruments will be muted.
-   - Select a given plugin (e.g., `swt`) and then choose an instrument (e.g., `xylophone`) from the dropdown:
+ - Switch sound themes by choosing a different theme in the dropdown showing `Cacophonia`.
+ - Choose your own instruments by:
+   - Click or drag one of the plugins you are interested in.
+   - A red X will show it is now fixed in place.
+   - Choose an instrument (e.g., `xylophone`) from the dropdown:
 
-     ![Cacophonia UI](/images/ui-swt-xylophone.png)
+     ![Cacophonia UI](/images/core-job-organ.png)
  
    - If you hear nothing, toggle the mute button.
    
