@@ -276,7 +276,7 @@ public class Graph extends JPanel {
 
 	void addRepelForceSlider() {
 		header.add(new Label("repel:"));
-		JSlider slider = new JSlider(0, 20000, (int)settings.repulsionForce);
+		JSlider slider = new JSlider(0, 40000, (int)settings.repulsionForce);
 		slider.setBackground(Color.white);
 		slider.setSize(200, 25);
 		slider.addChangeListener(new ChangeListener() {
@@ -341,7 +341,6 @@ public class Graph extends JPanel {
 				super.mousePressed(e);
 			}
 			
-			@Override
 	    	public void mouseClicked(MouseEvent e) {
 				Node node = findNode(e.getX(), e.getY());
 	    		if (node == null) return;
@@ -349,7 +348,7 @@ public class Graph extends JPanel {
 	    		case 1:
 	    			node.locationFixed = !node.locationFixed;
 	    			break;
-	    		case 2:
+	    		case 3:
 					for (PopupMenuListener listener: popupMenuListeners) {
 						PopupMenu menu = listener.createMenu(node.component);
 						add(menu);
