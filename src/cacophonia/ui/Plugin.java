@@ -164,6 +164,7 @@ public class Plugin extends Component {
 	public void setInstrument(int instrument) {
 		this.instrument = instrument;
 		UI.currentSoundTheme.setInstrument(name, instrument);
+		beep();
 	}
 
 	public static void clearInstruments() {
@@ -266,17 +267,17 @@ public class Plugin extends Component {
 
 	public void paint(java.awt.Graphics graphics) {
 		Graphics2D g = (Graphics2D)graphics;
-		if (node.graph.settings.debug) {
-			g.setColor(Color.WHITE);
-			g.drawString(name, getX(), getY());
-		}
-		if (node == null || getAge() < 0) return;
-		setTransparancy(g);
-		setBorderWidth(g);
-		setBackgroundColor(g);
 		int offset = getPluginOffset();
 		int x = getX() + offset;
 		int y = getY() + offset;
+		if (node.graph.settings.debug) {
+			setTransparancy(g);
+			g.setColor(Color.WHITE);
+			g.drawString(name, x, y - 17);
+		}
+		if (node == null || getAge() < 0) return;
+		setBorderWidth(g);
+		setBackgroundColor(g);
 		int size = getPluginSize();
 		g.fillOval(x, y, size, size);
 		setBorderColor(g);
