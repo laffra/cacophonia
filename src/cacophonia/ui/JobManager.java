@@ -27,7 +27,6 @@ public class JobManager {
 			AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f),
 	};
 
-	Font font = new Font("Courier New", Font.PLAIN, Constants.FONT_SIZE);
 	List<String> jobs = new ArrayList<String>();
 	boolean enabled;
 
@@ -50,12 +49,14 @@ public class JobManager {
 			}
 			
 			private void paintJobs(Graphics2D g) {
+				int fontSize = (int)(UI.currentScale * Constants.FONT_SIZE);
+				Font font = new Font("Courier New", Font.PLAIN, fontSize);
 				g.setFont(font);
 				g.setColor(Color.GRAY);
 				g.setComposite(Plugin.opaque);
 				int n=0;
 				for (String jobDetails: jobs) {
-					int y = Constants.HEIGHT - 100 - jobs.size() * 13 + 13 * n++;
+					int y = Constants.HEIGHT - 100 - jobs.size() * fontSize + fontSize * n++;
 					if (y > 60) {
 						int transparancyIndex = n / (jobs.size() / (transparancies.length) + 1);
 						Composite transparancy = transparancies[transparancyIndex];
