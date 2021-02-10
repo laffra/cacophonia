@@ -42,7 +42,7 @@ public class Settings {
 
 	// settings to cluster nodes that are related
 	public double relatedEdgeWeight = 5.0;
-	public double relatedEdgeDecay = Double.MIN_VALUE;
+	public double relatedEdgeDecay = 0;
 	public double relatedEdgeAttractionForce = 1.5;
 	public double relatedEdgeLength = 150;
 	public Color relatedEdgeColor = Color.BLUE;
