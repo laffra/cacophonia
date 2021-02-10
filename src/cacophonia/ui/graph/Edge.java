@@ -47,14 +47,7 @@ class Edge {
 	}
 
 	public void paint(Graphics2D g) {
-		if (weight < 1 || from.getAge() <= 0 || to.getAge() <= 0) {
-			if (color == Color.BLUE) {
-				System.out.println("skip " + weight);
-				System.out.println("   " + from);
-				System.out.println("   " + to);
-			}
-			return;
-		}
+		if (weight < 1 || from.getAge() <= 0 || to.getAge() <= 0) return;
 		Rectangle fromBounds = from.component.getBounds();
 		Rectangle toBounds = to.component.getBounds();
 		g.setColor(color);
