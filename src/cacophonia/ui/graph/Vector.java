@@ -23,11 +23,11 @@ public class Vector {
 	}
 	
 	public double getX() {
-		return force * Math.cos((Math.PI / 180.0) * angle);
+		return force * Math.cos((Math.PI / 180.0) * angle) + 0.01; // adjust for roundoff to int later
 	}
 
 	public double getY() {
-		return force * Math.sin((Math.PI / 180.0) * angle);
+		return force * Math.sin((Math.PI / 180.0) * angle) + 0.01; // adjust for roundoff to int later
 	}
 
 	public Vector add(Vector other) {
