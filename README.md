@@ -2,7 +2,7 @@
 
 This project visualizes Eclipse to better understand how it works internally.
 
-[![IMAGE ALT TEXT](http://img.youtube.com/vi/-lYNQ7SXGKY/0.jpg)](http://www.youtube.com/watch?v=-lYNQ7SXGKY "Project Cacophonia")
+[<img src="http://img.youtube.com/vi/-lYNQ7SXGKY/0.jpg" width=800>](http://www.youtube.com/watch?v=-lYNQ7SXGKY "Project Cacophonia")
 
 View the [Youtube video](http://www.youtube.com/watch?v=-lYNQ7SXGKY) explaining the motivation, implementation, and use of Cacophonia.
 
