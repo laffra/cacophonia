@@ -2,9 +2,9 @@
 
 This project visualizes Eclipse to better understand how it works internally.
 
-![Cacophonia UI](/images/animation-graph.gif)
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/lYNQ7SXGKY/0.jpg)](http://www.youtube.com/watch?v=lYNQ7SXGKY "Video Title")
 
-See a recording with sound [here](https://vimeo.com/509059065/c1e5a35812).
+Click the image above for a Youtube video explaining the motivation, implementation, and use of Cacophonia.
 
 ## Setup
 
